@@ -4,13 +4,14 @@ require "socket"
 
 module Chungmuro
   class Server
-    def initialize(host = "127.0.0.1", 
-                   port = 10001, 
-                   max_connections = 4, 
-                   stdlog = $stderr)
+    def initialize(max_connections,
+      host = "127.0.0.1",
+      port = 10001,
+      stdlog = $stderr)
+
       @host = host
       @port = port
-      @max_connections = max_connections  
+      @max_connections = max_connections
       @stdlog = stdlog
       @shutdown = true
     end
@@ -23,7 +24,7 @@ module Chungmuro
       @logger = make_logger
       @listener = make_listener(@logger)
       @workers = (max_connections || @max_connections).times.map do |i|
-        make_worker(@listener, @logger, ractor_name: "worker-#{i}") 
+        make_worker(@listener, @logger, ractor_name: "worker-#{i}")
       end
     end
 
