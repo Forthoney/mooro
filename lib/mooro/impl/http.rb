@@ -27,23 +27,21 @@ module Mooro
       class HttpServer < Server
         class << self
           def serve(io)
-            request = nil
             # parse first line
-            io.gets.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, proto|
+            io.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, proto|
               # parse HTTP headers
               header = Header.new
               while /^(\n|\r)/.match?(line = io.gets)
-                line.scan(/^([\w-]+):\s*(.*)$/) do |k, v|
+                line&.scan(/^([\w-]+):\s*(.*)$/) do |k, v|
                   header[k] = v.strip
                 end
               end
+              io.binmode
               request = Request.new(io, header, method, path, proto)
+              response = request_handler(request)
+              return io << response.to_s
             end
-            return io << Response[400, "Bad Request"].to_s if request.nil?
-
-            io.binmode
-            response = request_handler(request)
-            io << response.to_s
+            io << Response[400, "Bad Request"].to_s
           end
 
           def request_handler(request)

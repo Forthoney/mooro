@@ -21,7 +21,7 @@ module Mooro
       class Header
         @hash: Hash[String, _ToS]
 
-        include Enumerable
+        include Enumerable[String]
 
         def initialize: (?::Hash[String, _ToS] hash) -> void
 
