@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    chungmuro (0.1.0)
+    mooro (0.1.0)
 
 GEM
   remote: https://rubygems.org/
@@ -54,7 +54,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
-  chungmuro!
+  mooro!
   rake (~> 13.0)
   rspec (~> 3.0)
   rubocop-shopify (~> 2.14)
