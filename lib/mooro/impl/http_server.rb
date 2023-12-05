@@ -1,6 +1,6 @@
 # frozen_string_literal: true
 
-# sharable_constant_value: literal
+# shareable_constant_value: literal
 
 require "mooro"
 require "mooro/server"
@@ -46,6 +46,10 @@ module Mooro
           self
         end
 
+        def each
+          @hash.each { |k, v| yield k.capitalize, v }
+        end
+
         def map
           @hash.map { |k, v| yield k.capitalize, v }
         end
@@ -88,7 +92,7 @@ module Mooro
 
       class << self
         def http_header(header = nil)
-          new_header = Table.new(DEFAULT_HEADER)
+          new_header = Table.new(DEFAULT_HEADER.dup)
           new_header.update(header) unless header.nil?
 
           new_header["connection"] = "close"

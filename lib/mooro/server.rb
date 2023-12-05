@@ -106,6 +106,7 @@ module Mooro
         socket = TCPServer.new(host, port)
         logger.send("#{name} #{host}:#{port} start")
 
+        Ractor.current.send(true)
         until Ractor.receive == :terminate
           Ractor.current.send(true) # send itself any message other than :terminate
           Ractor.yield(socket.accept, move: true)
