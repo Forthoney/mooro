@@ -2,7 +2,7 @@
 
 require "mooro/version"
 require "mooro/server"
-require "mooro/impl/http_server"
+require "mooro/impl/http"
 
 module Mooro
   class Error < StandardError; end
