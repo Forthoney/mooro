@@ -45,6 +45,10 @@ module Mooro
             response = request_handler(request)
             io << response.to_s
           end
+
+          def request_handler(request)
+            Response[200]
+          end
         end
       end
 
@@ -90,8 +94,12 @@ module Mooro
           new_header = Header.new(DEFAULT_HEADER.dup)
           new_header.update(self)
           new_header["connection"] = "close"
-          new_header["date"] = http_date(Time.now)
+          new_header["date"] = http_time(Time.now)
           new_header
+        end
+
+        def http_time(time)
+          time.gmtime.strftime("%a, %d %b %Y %H:%M:%S GMT")
         end
       end
 
@@ -112,12 +120,6 @@ module Mooro
         def to_s
           "#{HTTP_PROTO} #{status_code} #{status_message}#{CRLF}#{header}#{body unless body.nil}"
         end
-      end
-
-      private
-
-      def http_date(time)
-        time.gmtime.strftime("%a, %d %b %Y %H:%M:%S GMT")
       end
     end
   end

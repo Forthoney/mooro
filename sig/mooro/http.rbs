@@ -1,0 +1,73 @@
+module Mooro
+  module Impl
+    module Http
+      CRLF: ::String
+
+      HTTP_PROTO: ::String
+
+      SERVER_NAME: ::String
+
+      DEFAULT_HEADER: Hash[String, String]
+
+      STATUS_CODE_MAPPING: ::Hash[Integer, String]
+
+      class HttpServer < Server
+        def self.serve: (TCPSocket io) -> void
+
+        def self.request_handler: (Request request) -> Response
+      end
+
+      # A case-insensitive Hash class for HTTP header
+      class Header
+        @hash: Hash[String, _ToS]
+
+        include Enumerable
+
+        def initialize: (?::Hash[String, _ToS] hash) -> void
+
+        def []: (_ToS key) -> untyped
+
+        def []=: (_ToS key, _ToS value) -> untyped
+
+        def update: (Hash[String, _ToS] hash) -> self
+
+        def each: () { (String, _ToS) -> untyped } -> untyped
+
+        def map: () { (untyped, untyped) -> untyped } -> untyped
+
+        def to_s: () -> String
+
+        private
+
+        def export: () -> Header
+
+        def http_time: (Time time) -> String
+      end
+
+      class Request
+        attr_reader data: IO
+        attr_reader header: Header
+        attr_reader method: String
+        attr_reader path: String
+        attr_reader proto: String
+
+        def initialize: (IO data, Header header, String method, String path, String proto) -> void
+        def self.[]: (IO data, Header header, String method, String path, String proto) -> Request
+        def content_length: () -> Integer?
+      end
+
+      class Response
+        attr_reader status_code: Integer
+        attr_reader status_message: String
+        attr_reader header: Header
+        attr_reader body: String
+
+        def initialize: (Integer status_code, ?String status_message, ?Header header, ?String body) -> void
+
+        def self.[]: (Integer status_code, ?String status_message, ?Header header, ?String body) -> Response
+
+        def to_s: () -> String
+      end
+    end
+  end
+end
