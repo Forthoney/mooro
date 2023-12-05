@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
-require_relative "mooro/version"
+require "mooro/version"
+require "mooro/server"
+require "mooro/impl/http_server"
 
 module Mooro
   class Error < StandardError; end
