@@ -7,6 +7,11 @@ gemspec
 
 gem "rake", "~> 13.0"
 
-gem "rspec", "~> 3.0"
+group :development do
+  gem "rubocop-shopify", "~> 2.14", require: false
+  gem "steep", require: false
+end
 
-gem "rubocop-shopify", "~> 2.14", group: :development
+group :test do
+  gem "rspec", "~> 3.0"
+end
