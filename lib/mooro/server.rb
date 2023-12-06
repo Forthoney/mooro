@@ -3,6 +3,8 @@
 require "socket"
 
 module Mooro
+  class StopServer < StandardError; end
+
   class Server
     class << self
       # Logic on how to serve each client
@@ -27,29 +29,24 @@ module Mooro
       @shutdown = true
     end
 
-    def start(max_connections = nil)
+    def start
       raise "server is already running" unless @shutdown
 
-      max_connections ||= @max_connections
       @shutdown = false
 
       @logger = make_logger
-      @listener = make_listener(@logger)
-      @workers = max_connections.times.map do |i|
-        make_worker(@listener, @logger, ractor_name: "worker-#{i}")
+      @workers = @max_connections.times.map do |i|
+        make_worker(Ractor.current, @logger, ractor_name: "worker-#{i}")
       end
+      @supervisor = make_supervisor(@logger, @workers)
+      @workers
     end
 
     def stop
       raise "server is not yet running" if @shutdown
 
-      @listener.send(:terminate)
-
-      @workers.each(&:take)
-
-      @logger.send(:terminate)
-      @logger.take
-
+      @supervisor.raise(Mooro::StopServer.new("stop"))
+      @supervisor.join
       raise "orphaned ractor" unless Ractor.count == 1
 
       @shutdown = true
@@ -81,17 +78,17 @@ module Mooro
     # Worker terminates when the listener closes its outgoing port
     def make_worker(listener, logger, ractor_name: "worker")
       Ractor.new(self.class, listener, logger, name: ractor_name) do |server, listener, logger|
-        loop do
-          client = listener.take
-          server.serve(client)
-        rescue Ractor::ClosedError
-          logger.send("#{name} stop")
-          break
-        rescue => err
-          logger.send(err.to_s)
-          retry
-        ensure
-          client&.close
+        until (client = listener.take) == :terminate
+          begin
+            server.serve(client)
+            client.close
+          rescue Ractor::ClosedError => closed_err
+            logger.send("#{closed_err}: Listener's outgoing port is closed")
+            break
+          rescue => err
+            logger.send(err.to_s)
+            client&.close
+          end
         end
       end
     end
@@ -100,22 +97,33 @@ module Mooro
     # The listener dispatches clients for the workers to take on
     # listener --->> worker
     # listener ----> logger
-    # Listener terminates on receiving :terminate
-    def make_listener(logger, ractor_name: "listener")
-      Ractor.new(logger, @host, @port, name: ractor_name) do |logger, host, port|
-        socket = TCPServer.new(host, port)
-        logger.send("#{name} #{host}:#{port} start")
+    # Listener terminates on receiving an Integer representing the number
+    # of workers to send the :terminate message to
+    #
+    # Listener will send itself true if socket has been accepted in previous iter
+    # false if it still needs to wait
+    def make_supervisor(logger, workers)
+      Thread.new(logger, workers.dup, TCPServer.new(@host, @port)) do |logger, workers, socket|
+        logger.send("listener #{@host}:#{@port} start")
 
-        Ractor.current.send(true)
-        until Ractor.receive == :terminate
-          Ractor.current.send(true) # send itself any message other than :terminate
-          Ractor.yield(socket.accept, move: true)
+        loop do
+          client = socket.accept
+          Ractor.yield(client, move: true)
+        rescue Mooro::StopServer
+          logger.send("listener #{@host}:#{@port} stop")
+          break
+        rescue => err
+          logger.send(err.to_s)
+          break
         end
 
-        logger.send("#{name} #{host}:#{port} stop")
-        # Need to explicitly close_outgoing to not put anything in the outgoing
-        # queue when returning. Otherwise, a worker will take that output
-        Ractor.current.close_outgoing
+        # Termination process
+        until workers.empty?
+          Ractor.yield(:terminate)
+          r, _ = Ractor.select(*workers)
+          workers.delete(r)
+        end
+        logger.send(:terminate)
       end
     end
   end

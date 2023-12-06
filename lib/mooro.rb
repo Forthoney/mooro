@@ -5,6 +5,5 @@ require "mooro/server"
 require "mooro/impl/http"
 
 module Mooro
-  class Error < StandardError; end
   # Your code goes here...
 end

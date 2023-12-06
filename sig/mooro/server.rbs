@@ -1,4 +1,5 @@
 module Mooro
+  class StopServer < StandardError end
   class Server
     @host: String
 
@@ -12,7 +13,7 @@ module Mooro
 
     @logger: Ractor
 
-    @listener: Ractor
+    @Supervisor: Thread
 
     @workers: Array[Ractor]
 
@@ -25,7 +26,7 @@ module Mooro
 
     def initialize: (Integer max_connections, ?::String host, ?::Integer port, ?IO stdlog) -> void
 
-    def start: (?Integer? max_connections) -> Array[Ractor]
+    def start: () -> Array[Ractor]
 
     def stop: () -> bool
 
@@ -46,11 +47,11 @@ module Mooro
     # Worker terminates when the listener closes its outgoing port
     def make_worker: (Ractor listener, Ractor logger, ?ractor_name: ::String) -> Ractor
 
-    # Create a listener Ractor
+    # Create a supervisor thread on the main Ractor
     # The listener dispatches clients for the workers to take on
     # listener --->> worker
     # listener ----> logger
     # Listener terminates on receiving :terminate
-    def make_listener: (Ractor logger, ?ractor_name: ::String) -> Ractor
+    def make_supervisor: (Ractor logger, Array[Ractor] workers) -> Thread
   end
 end
