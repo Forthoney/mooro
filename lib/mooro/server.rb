@@ -3,7 +3,7 @@
 require "socket"
 
 module Mooro
-  class StopServer < StandardError; end
+  class TerminateServer < StandardError; end
 
   class Server
     class << self
@@ -13,7 +13,7 @@ module Mooro
       # Mooro's workaround is to define a class method, which is able to be called
       # This comes with the caveat that no shared object can live in the function body
       def serve(io)
-        io.puts("hello world")
+        io.puts("Hello World!")
       end
     end
 
@@ -45,7 +45,7 @@ module Mooro
     def stop
       raise "server is not yet running" if @shutdown
 
-      @supervisor.raise(Mooro::StopServer.new("stop"))
+      @supervisor.raise(Mooro::TerminateServer.new) if @supervisor.alive?
       @supervisor.join
       raise "orphaned ractor" unless Ractor.count == 1
 
@@ -55,12 +55,15 @@ module Mooro
     protected
 
     # Create a logger Ractor
+    # workers & supervisor ----> logger
+    #
     # The logger logs messages to @stdlog with the timestamp of when the
     # message was processed
-    # workers & listener ----> logger
-    # Workers and the listener will send messages to logger (push based)
-    # Logger only yields one value
-    # Logger terminates on receiving :terminate
+    # Workers and the supervisor will send messages to logger (push based)
+    #
+    # Termination:
+    # Logger only yields once when it terminates. Do not take from it unless
+    # joining - the taking thread will hang otherwise
     def make_logger(ractor_name: "logger")
       Ractor.new(@stdlog, name: ractor_name) do |out_stream|
         until (msg = Ractor.receive) == :terminate
@@ -71,59 +74,87 @@ module Mooro
     end
 
     # Create a worker Ractor
+    # supervisor >---- worker ----> logger
+    #
     # The worker actually serves the client
-    # listener --->> worker ----> logger
-    # Workers take a client from the listener (pull based)
-    # and send messages to logger when non-standard behavior occurs (push based)
-    # Worker terminates when the listener closes its outgoing port
-    def make_worker(listener, logger, ractor_name: "worker")
-      Ractor.new(self.class, listener, logger, name: ractor_name) do |server, listener, logger|
-        until (client = listener.take) == :terminate
+    # Workers take a client from the supervisor (pull based)
+    # and send messages to logger when non-ractor exceptions are raised (push based)
+    #
+    # Termination:
+    # Workers do not stop while the supervisor is alive unless explicitly told to
+    def make_worker(supervisor, logger, ractor_name: "worker")
+      Ractor.new(
+        self.class,
+        supervisor,
+        logger,
+        name: ractor_name,
+      ) do |server, supervisor, logger|
+        # Failure point 1: supervisor.take
+        # - ClosedError: supervisor is already dead
+        # - RemoteError: supervisor raised some unhandled error
+        # Neither are really recoverable...
+        until (client = supervisor.take) == :terminate
+          # Failure point 2: server.serve
+          # Rescue any error and move on to next client
           begin
             server.serve(client)
-            client.close
-          rescue Ractor::ClosedError => closed_err
-            logger.send("#{closed_err}: Listener's outgoing port is closed")
-            break
           rescue => err
             logger.send(err.to_s)
+          ensure
             client&.close
           end
         end
+      rescue Ractor::ClosedError => closed_err
+        logger.send("#{closed_err}: Supervisor's outgoing port is closed")
       end
     end
 
-    # Create a listener Ractor
-    # The listener dispatches clients for the workers to take on
-    # listener --->> worker
-    # listener ----> logger
-    # Listener terminates on receiving an Integer representing the number
-    # of workers to send the :terminate message to
+    # Create a supervisor Ractor
     #
-    # Listener will send itself true if socket has been accepted in previous iter
-    # false if it still needs to wait
+    # supervisor >---- worker
+    #          |-----> logger
+    #
+    # The supervisor dispatches clients for the workers to take on
+    # Supervisor safely terminates on receiving TerminateServer error.
+    # This will be triggered remotely by the main thread on the main ractor.
+    # Graceful termination will safely join with workers and logger.
+    # Assuming no workers or the logger is blocking, graceful termination guarantees
+    # joining with all child ractors. This is becausee workers are guaranteed to
+    # survive as long as the supervisor too is alive and well.
+    #
+    # Termination
+    # Any other error will trigger a "non-graceful" termination.
+    # We do not know if any child ractors are in a blocking state, so we cannot
+    # yield or take from any of them without risk of blocking the supervisor.
+    # So, the supervisor does not attempt to join.
     def make_supervisor(logger, workers)
-      Thread.new(logger, workers.dup, TCPServer.new(@host, @port)) do |logger, workers, socket|
-        logger.send("listener #{@host}:#{@port} start")
+      Thread.new(
+        logger,
+        workers.dup,
+        TCPServer.new(@host, @port),
+      ) do |logger, workers, socket|
+        logger.send("supervisor #{@host}:#{@port} start")
 
         loop do
           client = socket.accept
           Ractor.yield(client, move: true)
-        rescue Mooro::StopServer
-          logger.send("listener #{@host}:#{@port} stop")
-          break
-        rescue => err
-          logger.send(err.to_s)
+        rescue TerminateServer
+          logger.send("supervisor #{@host}:#{@port} gracefully stopping...")
+          # Termination process
+          # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
+          # Currently rely on yielding and blocking until some worker picks it up.
+          # Assumes workers do not terminate unless they encounter
+          until workers.empty?
+            Ractor.yield(:terminate)
+            r, _ = Ractor.select(*workers)
+            workers.delete(r)
+          end
           break
         end
-
-        # Termination process
-        until workers.empty?
-          Ractor.yield(:terminate)
-          r, _ = Ractor.select(*workers)
-          workers.delete(r)
-        end
+      rescue => unexpected_err
+        logger.send("supervisor #{@host}:#{@port} crashed with #{unexpected_err}")
         logger.send(:terminate)
+        logger.take
       end
     end
   end

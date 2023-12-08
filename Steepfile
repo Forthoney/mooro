@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 D = Steep::Diagnostic
 
 target :lib do
@@ -10,7 +12,7 @@ target :lib do
   library "socket"
   # library "strong_json"           # Gems
 
-  configure_code_diagnostics(D::Ruby.default)      # `default` diagnostics setting (applies by default)
+  configure_code_diagnostics(D::Ruby.default) # `default` diagnostics setting (applies by default)
   # configure_code_diagnostics(D::Ruby.strict)       # `strict` diagnostics setting
   # configure_code_diagnostics(D::Ruby.lenient)      # `lenient` diagnostics setting
   # configure_code_diagnostics(D::Ruby.silent)       # `silent` diagnostics setting
@@ -24,5 +26,5 @@ target :test do
 
   check "test"
 
-  library "socket"              # Standard libraries
+  library "socket" # Standard libraries
 end

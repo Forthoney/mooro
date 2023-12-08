@@ -1,5 +1,5 @@
 module Mooro
-  class StopServer < StandardError end
+  class TerminateServer < StandardError end
   class Server
     @host: String
 
@@ -13,7 +13,7 @@ module Mooro
 
     @logger: Ractor
 
-    @Supervisor: Thread
+    @supervisor: Thread
 
     @workers: Array[Ractor]
 
@@ -28,7 +28,7 @@ module Mooro
 
     def start: () -> Array[Ractor]
 
-    def stop: () -> bool
+    def stop: () -> void
 
     # Create a logger Ractor
     # The logger logs messages to @stdlog with the timestamp of when the
