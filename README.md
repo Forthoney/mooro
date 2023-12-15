@@ -1,8 +1,11 @@
 # Mooro
 
-TODO: Delete this and the text below, and describe your gem
+A truly parallel, loggable, minimal TCP Server in CRuby.
+Mooro's vanilla server is a super compact (< 150 LOC with comments) TCP Server.
+Features such as HTTP support or interruptable workers are available through the `Mooro::Impl` module.
+The simple architecture means it's easy for you to extend it yourself to fit your needs!
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/mooro`. To experiment with that code, run `bin/console` for an interactive prompt.
+Loosely based on the [GServer](https://github.com/ruby/gserver) specification.
 
 ## Installation
 
@@ -18,7 +21,34 @@ If bundler is not being used to manage dependencies, install the gem by executin
 
 ## Usage
 
-TODO: Write usage instructions here
+If you want to create a basic server that outputs the time,
+```ruby
+class TimeServer < Mooro::Server
+  class << self
+    def serve(io)
+      io.puts(Time.now.to_i)
+    end
+  end
+end
+
+server = TimeServer.new(max_connections = 4)
+server.start
+```
+
+You can also build HTTP Servers using the `Mooro::Impl::Http` module.
+A healthcheck server like the one [here](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
+```ruby
+Http = Mooro::Impl::Http
+
+class HealthCheck < Http::Server
+  class << self
+    def request_handler(req)
+      req.path == "/" ? Http::Response[200] : Http::Response[404]
+    end
+  end
+end
+```
+
 
 ## Development
 
@@ -28,7 +58,11 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/mooro. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/mooro/blob/main/CODE_OF_CONDUCT.md).
+Mooro is in desperate need of Tests (both Unit and Integration) and Benchmarks.
+I unfortunately lack the expertise needed for either of these, so any contribution in these areas are greatly appreciated.
+Contributions outside these areas are, of course, also welcome.
+
+Bug reports and pull requests are welcome on GitHub at https://github.com/Forthoney/mooro. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/mooro/blob/main/CODE_OF_CONDUCT.md).
 
 ## License
 
@@ -36,4 +70,4 @@ The gem is available as open source under the terms of the [MIT License](https:/
 
 ## Code of Conduct
 
-Everyone interacting in the Mooro project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/[USERNAME]/mooro/blob/main/CODE_OF_CONDUCT.md).
+Everyone interacting in the Mooro project's codebases, issue trackers, chat rooms and mailing lists is expected to follow the [code of conduct](https://github.com/Forthoney/mooro/blob/main/CODE_OF_CONDUCT.md).

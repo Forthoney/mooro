@@ -24,8 +24,10 @@ module Mooro
         500 => "Internal Server Error",
       }
 
-      class HttpServer < Server
+      class Server < Server
         class << self
+          protected
+
           def serve(io)
             # parse first line
             io.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, proto|
