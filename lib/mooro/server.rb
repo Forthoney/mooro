@@ -6,17 +6,6 @@ module Mooro
   class TerminateServer < StandardError; end
 
   class Server
-    class << self
-      # Logic on how to serve each client
-      # Server.serve must be a pure function, and any variables must be passed explicitly
-      # The only means of passing a Method or Proc as a nested proc are currently hacky
-      # Mooro's workaround is to define a class method, which is able to be called
-      # This comes with the caveat that no shared object can live in the function body
-      def serve(io)
-        io.puts("Hello World!")
-      end
-    end
-
     def initialize(max_connections,
       host = "127.0.0.1",
       port = 10001,
@@ -55,6 +44,10 @@ module Mooro
 
     protected
 
+    def serve(io)
+      io.puts("Hello, World!")
+    end
+
     # Create a logger Ractor
     # workers & supervisor ----> logger
     #
@@ -84,12 +77,8 @@ module Mooro
     # Termination:
     # Workers do not stop while the supervisor is alive unless explicitly told to
     def make_worker(supervisor, logger, ractor_name: "worker")
-      Ractor.new(
-        self.class,
-        supervisor,
-        logger,
-        name: ractor_name,
-      ) do |server, supervisor, logger|
+      block = Ractor.make_shareable(method(:serve).to_proc)
+      Ractor.new(supervisor, logger, block, name: ractor_name) do |supervisor, logger, serve|
         # Failure point 1: supervisor.take
         # - ClosedError: supervisor is already dead
         # - RemoteError: supervisor raised some unhandled error
@@ -98,9 +87,9 @@ module Mooro
           # Failure point 2: server.serve
           # Rescue any error and move on to next client
           begin
-            server.serve(client)
+            serve.call(client)
           rescue => err
-            logger.send(err.to_s)
+            logger.send([err.to_s, err.backtrace])
           ensure
             client&.close
           end
