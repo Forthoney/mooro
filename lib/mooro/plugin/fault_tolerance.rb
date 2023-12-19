@@ -4,11 +4,9 @@ require "mooro"
 require "mooro/server"
 
 module Mooro
-  module Impl
+  module Plugin 
     module FaultTolerance
-      class InterruptableServer < Server
-        protected
-
+      module InterruptableServer
         def make_worker(supervisor, logger, ractor_name: "interruptable_worker")
           Ractor.new(
             self.class,

@@ -21,7 +21,7 @@ Mooro does not, and does not intend to, at least in the base Server.
 There is, of course, the question of how. This is nontrivial but also not impossible.
 More importantly, I feel multiserver management disregards Mooro's leanness principle.
 My unsubstantiated opinion is that if you really have need for that multiserver management, Mooro is too light for you.
-I am very very open to being proven wrong, and if proven wrong, will write a `Impl::Multiserver`.
+I am very very open to being proven wrong, and when proven wrong, will write a `Plugin::Multiserver`.
 
 ## Tests and Benchmarks
 Mooro would _like_ to be different from GServer by having adequate tests and benchmarks.

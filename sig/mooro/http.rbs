@@ -1,5 +1,5 @@
 module Mooro
-  module Impl
+  module Plugin
     module Http
       CRLF: ::String
 

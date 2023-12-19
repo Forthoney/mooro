@@ -2,7 +2,7 @@
 
 A truly parallel, loggable, minimal TCP Server in CRuby.
 Mooro's vanilla server is a super compact (< 150 LOC with comments) TCP Server.
-Features such as HTTP support or interruptable workers are available through the `Mooro::Impl` module.
+Features such as HTTP support or interruptable workers are available through the `Mooro::Plugin` module.
 The simple architecture means it's easy for you to extend it yourself to fit your needs!
 
 Loosely based on the [GServer](https://github.com/ruby/gserver) specification.
@@ -35,12 +35,14 @@ server = TimeServer.new(max_connections = 4)
 server.start
 ```
 
-You can also build HTTP Servers using the `Mooro::Impl::Http` module.
+You can also build HTTP Servers using the `Mooro::Plugin::Http` module.
 A healthcheck server like the one [here](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
 ```ruby
-Http = Mooro::Impl::Http
+Http = Mooro::Plugin::Http
 
-class HealthCheck < Http::Server
+class HealthCheck < Mooro::Server
+  prepend Http
+
   class << self
     def request_handler(req)
       req.path == "/" ? Http::Response[200] : Http::Response[404]
