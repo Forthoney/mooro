@@ -47,6 +47,7 @@ module Mooro
 
       @supervisor.raise(Mooro::TerminateServer.new) if @supervisor.alive?
       @supervisor.join
+
       raise "orphaned ractor" unless Ractor.count == 1
 
       @shutdown = true
@@ -150,9 +151,11 @@ module Mooro
             workers.delete(r)
           end
           break
+        rescue => unexpected_err
+          logger.send("supervisor #{@host}:#{@port} crashed with #{unexpected_err}")
+          break
         end
-      rescue => unexpected_err
-        logger.send("supervisor #{@host}:#{@port} crashed with #{unexpected_err}")
+
         logger.send(:terminate)
         logger.take
       end
