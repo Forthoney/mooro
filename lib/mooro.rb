@@ -2,7 +2,7 @@
 
 require "mooro/version"
 require "mooro/server"
-require "mooro/plugin/http"
+require "mooro/impl/http"
 require "mooro/plugin/fault_tolerance"
 
 module Mooro

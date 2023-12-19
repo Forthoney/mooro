@@ -1,15 +1,21 @@
-# Mooro
+# Mooro: A truly parallel, super compact TCP Server in CRuby.
 
-A truly parallel, loggable, minimal TCP Server in CRuby.
-Mooro's vanilla server is a super compact (< 150 LOC with comments) TCP Server.
-Features such as HTTP support or interruptable workers are available through the `Mooro::Plugin` module.
-The simple architecture means it's easy for you to extend it yourself to fit your needs!
+Mooro is a no-dependency, parallel TCP Server with essential features like **logging, worker-pooling, and graceful-stopping**.
 
-Loosely based on the [GServer](https://github.com/ruby/gserver) specification.
+## Features
+Mooro was born from the idea that vanilla Ruby is the best Ruby.
+It aims to offer a web server for CRuby without compromising on any essential features of a modern Ruby server
+* **CRuby & Parallel**. Mooro will actually run in parallel with CRuby thanks to `Ractor`s.
+* **Logging**. Supervisor start/stop, worker errors, and other notable events are logged by default, and adding additional logging points is as simple as adding `logger.send("message")`.
+* **Extensible**. Effectively no abstraction beyond TCPServer, so anything higher level than TCP (e.g. raw HTTP) is fair game.
+* **Stoppable**. Capable of gracefully stopping (or forcefully, if you would prefer that).
+
+In the process, it also happened to possess these nice-to-have qualities.
+* **Compact**. The base server has 0 dependencies and fits in less than 150 lines of code(count _includes_ comments)!
+* **Pure Ruby**. No C extensions, so you don't need to dive into the shadow realm to figure out the internals.
+* **Almost GServer compatible**. Most of the server interface is identical to [GServer](https://github.com/ruby/gserver), an ex-stdlib Generic Server, for familiarity's sake.
 
 ## Installation
-
-TODO: Replace `UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG` with your gem name right after releasing it to RubyGems.org. Please do not do it earlier due to security reasons. Alternatively, replace this section with instructions to install your gem from git if you don't plan to release to RubyGems.org.
 
 Install the gem and add to the application's Gemfile by executing:
 
@@ -24,29 +30,24 @@ If bundler is not being used to manage dependencies, install the gem by executin
 If you want to create a basic server that outputs the time,
 ```ruby
 class TimeServer < Mooro::Server
-  class << self
-    def serve(io)
-      io.puts(Time.now.to_i)
-    end
+  def serve(io)
+    io.puts(Time.now.to_i)
   end
 end
 
 server = TimeServer.new(max_connections = 4)
 server.start
+sleep(15)
+server.stop
 ```
 
-You can also build HTTP Servers using the `Mooro::Plugin::Http` module.
-A healthcheck server like the one [here](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
+A healthcheck server like [this](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
 ```ruby
-Http = Mooro::Plugin::Http
+Http = Mooro::Impl::Http
 
-class HealthCheck < Mooro::Server
-  prepend Http
-
-  class << self
-    def request_handler(req)
-      req.path == "/" ? Http::Response[200] : Http::Response[404]
-    end
+class HealthCheck < Http::Server
+  def handle_request(req)
+    req.path == "/" ? Http::Response[200] : Http::Response[404]
   end
 end
 ```
