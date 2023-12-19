@@ -7,14 +7,6 @@ Logging is turned on in Mooro, whereas you need to turn it on for GServer.
 The default Server does not allow for turning it off, but there is nothing technically stopping anyone from turning it off.
 This is more of a "I got a bit lazy" portion - I would appreciate contributions that enable this easily!
 
-## Server#serve vs Server.serve
-In GServer, the serve method is overridden as an instance method.
-In Mooro, it must be overridden as a class method.
-To the end user, this should be a pretty straightforward change, but internally, the story is more complicated.
-Ractors cannot use instance methods of the Server class without some tricks.
-Using a class method is pretty well defined, however.
-Mooro therefore requests the user changes a couple lines rather than introducing unnecessary complexity to Mooro.
-
 ## Multiserver Management
 GServer comes built with multiserver management.
 Mooro does not, and does not intend to, at least in the base Server.
@@ -24,4 +16,5 @@ My unsubstantiated opinion is that if you really have need for that multiserver 
 I am very very open to being proven wrong, and when proven wrong, will write a `Plugin::Multiserver`.
 
 ## Tests and Benchmarks
+One of the [reasons](https://bugs.ruby-lang.org/issues/5480) why `gserver` was removed from stdlib was due to a lack of tests.
 Mooro would _like_ to be different from GServer by having adequate tests and benchmarks.
