@@ -21,14 +21,12 @@ module Mooro
     def start
       raise "server is already running" unless @shutdown
 
-      @shutdown = false
-
       @logger = make_logger
       @workers = @max_connections.times.map do |i|
         make_worker(Ractor.current, @logger, ractor_name: "worker-#{i}")
       end
       @supervisor = make_supervisor(@logger, @workers)
-      @workers
+      @shutdown = false
     end
 
     def stop
@@ -40,6 +38,10 @@ module Mooro
       raise "orphaned ractor" unless Ractor.count == 1
 
       @shutdown = true
+    end
+
+    def running?
+      !@shutdown
     end
 
     protected
@@ -118,33 +120,31 @@ module Mooro
     # yield or take from any of them without risk of blocking the supervisor.
     # So, the supervisor does not attempt to join.
     def make_supervisor(logger, workers)
-      Thread.new(
-        logger,
-        workers.dup,
-        TCPServer.new(@host, @port),
-      ) do |logger, workers, socket|
-        logger.send("supervisor #{@host}:#{@port} start")
+      # Dupe workers array because we mutate it when stopping
+      Thread.new(workers.dup) do |workers|
+        logger.send("supervisor start")
+        TCPServer.open(@host, @port) do |socket|
+          logger.send("supervisor socket opened at #{@host}:#{@port}")
 
-        loop do
-          client = socket.accept
-          Ractor.yield(client, move: true)
-        rescue TerminateServer
-          logger.send("supervisor #{@host}:#{@port} gracefully stopping...")
-          # Termination process
-          # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
-          # Currently rely on yielding and blocking until some worker picks it up.
-          # Assumes workers do not terminate unless they encounter
-          until workers.empty?
-            Ractor.yield(:terminate)
-            r, _ = Ractor.select(*workers)
-            workers.delete(r)
+          loop do
+            client = socket.accept
+            Ractor.yield(client, move: true)
+          rescue TerminateServer
+            logger.send("supervisor at #{@host}:#{@port} gracefully stopping...")
+            # Termination process
+            # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
+            # Currently rely on yielding and blocking until some worker picks it up.
+            # Assumes workers do not terminate unless they encounter
+            until workers.empty?
+              Ractor.yield(:terminate)
+              r, _ = Ractor.select(*workers)
+              workers.delete(r)
+            end
+            break
           end
-          break
         rescue => unexpected_err
-          logger.send("supervisor #{@host}:#{@port} crashed with #{unexpected_err}")
-          break
+          logger.send("supervisor at #{@host}:#{@port} crashed with #{unexpected_err}")
         end
-
         logger.send(:terminate)
         logger.take
       end
