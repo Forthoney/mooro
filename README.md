@@ -1,29 +1,18 @@
-# Mooro: A truly parallel, super compact TCP Server in CRuby.
-
-Mooro is a no-dependency, parallel TCP Server with essential features like **logging, worker-pooling, and graceful-stopping**.
+# Mooro: A truly parallel server for CRuby
+Mooro is a compact, parallel TCP server targeting CRuby. It is built to be extended - you can only do so much with raw TCP sockets - and offers straigtforward ways (and examples) of doing so.
 
 ## Uncompromising Minimalism
-Mooro aims to deliver most if not all essential features expected from a modern Ruby web server such as
-* **Parallel**. Mooro utilizes true parallelism with CRuby through `Ractor`s.
-* **Loggable**. Supervisor start/stop, worker errors, and other notable events are logged by default, and adding additional logging points is as simple as adding `logger.send("message")`.
-* **Stoppable**. Capable of gracefully stopping (or forcefully, if you would prefer that).
+Mooro aims to deliver all essential features expected from a modern Ruby web server such as
+* **Parallelism**. Mooro utilizes true parallelism with CRuby through `Ractor`s.
+* **Logging**. Supervisor start/stop, worker errors, and other notable events are logged by default, and adding additional logging points is as simple as adding `logger.send("message")`.
+* **Stopping**. Capable of gracefully stopping (or forcefully, if you prefer that).
 
-At the same time, it abstracts away virtually nothing away from TCPServer to allow for maximum extensibility.
-Anything at the TCP level and higher, such as raw HTTP, is fair game for Mooro!
+At the same time, it abstracts virtually nothing away from TCPServer, enabling maximum extensibility.
+Anything at the TCP level and higher is fair game for Mooro.
 Extending Mooro is quite simple because it is
-* **Compact**. The base server has 0 dependencies and fits in less than 150 lines of code(this number _includes_ comments)!
+* **Compact**. The base server has 0 dependencies and fits in less than 150 lines of code. Yes, this number _includes_ comments!
 * **Pure Ruby**. No C extensions, so you don't need to dive into the shadow realm to figure out the internals of Mooro.
 * **Almost GServer compatible**. Most of the server interface is identical to [GServer](https://github.com/ruby/gserver), an ex-stdlib Generic Server, for familiarity's sake.
-
-## Installation
-
-Install the gem and add to the application's Gemfile by executing:
-
-    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG
-
-If bundler is not being used to manage dependencies, install the gem by executing:
-
-    $ gem install UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG
 
 ## Usage
 
@@ -42,7 +31,7 @@ server.stop
 ```
 
 Mooro ships with an implementation of an HTTP Server.
-A healthcheck server like [this](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
+A [healthcheck server](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
 ```ruby
 Http = Mooro::Impl::Http
 
@@ -52,6 +41,18 @@ class HealthCheck < Http::Server
   end
 end
 ```
+
+## Installation
+
+Install the gem and add to the application's Gemfile by executing:
+
+    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG
+
+If bundler is not being used to manage dependencies, install the gem by executing:
+
+    $ gem install UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG
+
+
 
 ## Development
 
@@ -74,7 +75,7 @@ Bug reports and pull requests are welcome on GitHub at https://github.com/Fortho
 * Mooro is quite incompatible with older versions of Ruby. Anything pre-`Ractor` (i.e. pre 3.0) obviously does not work.
 The builtin HTTP Server requires Ruby 3.2 or later, although this can easily be circumvented if need be.
 
-* Mooro's interface is not exactly like `gserver`. Read more [here](docs/gserver_differences.md).
+* Mooro's interface is not exactly like `gserver`. Read more about the differences [here](docs/gserver_differences.md).
 
 ## License
 
