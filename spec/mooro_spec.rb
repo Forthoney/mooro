@@ -2,6 +2,6 @@
 
 RSpec.describe(Mooro) do
   it "has a version number" do
-    expect(Mooro::VERSION).not_to(be(nil))
+    expect(Mooro::VERSION).not_to(be_nil)
   end
 end
