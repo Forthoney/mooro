@@ -49,6 +49,7 @@ class HealthCheck < Http::Server
 end
 ```
 
+Mooro, for the most part, follows GServer's interface. Read more about the differences [here](docs/gserver_differences.md).
 
 ## Development
 
@@ -62,7 +63,7 @@ Mooro is in desperate need of Tests (both Unit and Integration) and Benchmarks.
 I unfortunately lack the expertise needed for either of these, so any contribution in these areas are greatly appreciated.
 Contributions outside these areas are, of course, also welcome.
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/Forthoney/mooro. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/[USERNAME]/mooro/blob/main/CODE_OF_CONDUCT.md).
+Bug reports and pull requests are welcome on GitHub at https://github.com/Forthoney/mooro. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/Forthoney/mooro/blob/main/CODE_OF_CONDUCT.md).
 
 ## License
 
