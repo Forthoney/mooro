@@ -1,5 +1,5 @@
 # Mooro: A truly parallel server for CRuby
-Mooro is a compact, parallel TCP server targeting CRuby. It is built to be extended - you can only do so much with raw TCP sockets - and offers straigtforward ways (and examples) of doing so.
+Mooro is a Ractor-based, compact, parallel TCP server targeting CRuby. It is built to be extended - you can only do so much with raw TCP sockets - and offers straigtforward ways (and examples) of doing so.
 
 ## Uncompromising Minimalism
 Mooro aims to deliver all essential features expected from a modern Ruby web server such as
