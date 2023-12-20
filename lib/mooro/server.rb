@@ -131,10 +131,7 @@ module Mooro
             Ractor.yield(client, move: true)
           rescue TerminateServer
             logger.send("supervisor at #{@host}:#{@port} gracefully stopping...")
-            # Termination process
             # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
-            # Currently rely on yielding and blocking until some worker picks it up.
-            # Assumes workers do not terminate unless they encounter
             until workers.empty?
               Ractor.yield(:terminate)
               r, _ = Ractor.select(*workers)

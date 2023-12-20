@@ -1,5 +1,9 @@
 module Mooro
   module Impl
+    # A rudimentary HTTP server based off of gserver/xmlrpc.rb with
+    # bits of WEBRICK sprinkled in where xmlrpc is incorrect
+    # It serves more of a demonstration purpose although it can suit
+    # small internal applications.
     module Http
       CRLF: ::String
 
@@ -11,29 +15,18 @@ module Mooro
 
       STATUS_CODE_MAPPING: ::Hash[Integer, String]
 
-      class HttpServer < Server
-        def self.serve: (TCPSocket io) -> void
+      class Server < Mooro::Server
+        def serve: (TCPSocket io) -> void
 
-        def self.request_handler: (Request request) -> Response
+        def request_handler: (Request request) -> Response
+
+        private
+
+        def parse_header: (TCPSocket io) -> Header?
       end
 
-      # A case-insensitive Hash class for HTTP header
-      class Header
-        @hash: Hash[String, _ToS]
-
-        include Enumerable[String]
-
-        def initialize: (?::Hash[String, _ToS] hash) -> void
-
-        def []: (_ToS key) -> untyped
-
-        def []=: (_ToS key, _ToS value) -> untyped
-
-        def update: (Hash[String, _ToS] hash) -> self
-
-        def each: () { (String, _ToS) -> untyped } -> untyped
-
-        def map: () { (untyped, untyped) -> untyped } -> untyped
+      class Header < Hash[String, String]
+        DEFAULT_HEADER: Hash[String, String]
 
         def to_s: () -> String
 
@@ -41,7 +34,7 @@ module Mooro
 
         def export: () -> Header
 
-        def http_time: (Time time) -> String
+        def http_time: (untyped time) -> String
       end
 
       class Request

@@ -6,13 +6,14 @@ require "mooro/server"
 
 module Mooro
   module Impl
+    # A rudimentary HTTP server based off of gserver/xmlrpc.rb with
+    # bits of WEBRICK sprinkled in where xmlrpc is incorrect
+    # It serves more of a demonstration purpose although it can suit
+    # small internal applications.
     module Http
       CRLF = "\r\n"
       HTTP_PROTO = "HTTP/1.0"
-      SERVER_NAME = "HttpServer (Ruby #{RUBY_VERSION})"
-      DEFAULT_HEADER = {
-        "Server" => SERVER_NAME,
-      }
+      SERVER_NAME = "Mooro HttpServer (Ruby #{RUBY_VERSION})"
 
       STATUS_CODE_MAPPING = {
         200 => "OK",
@@ -33,60 +34,53 @@ module Mooro
         def serve(io)
           # parse first line
           io.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, proto|
-            # parse HTTP headers
-            header = Header.new
-            while /^(\n|\r)/.match?(line = io.gets)
-              line&.scan(/^([\w-]+):\s*(.*)$/) { |k, v| header[k] = v.strip }
-            end
+            header = parse_header(io)
+            return io << Response[400].to_s if header.nil?
+
             io.binmode
-            request = Request.new(io, header, method, path, proto)
+            request = Request[io, header, method, path, proto]
             response = handle_request(request)
             return io << response.to_s
           end
-          io << Response[400, "Bad Request"].to_s
+
+          io << Response[400].to_s
+        end
+
+        private
+
+        def parse_header(io)
+          # parse HTTP headers
+          header = Header.new { |h, k| h[k] = [] }
+          field = nil
+          while /^(\n|\r)/.match?(line = io.gets)
+            case line
+            when /^([A-Za-z0-9!\#$%&'*+\-.^_`|~]+):(.*?)\z/om
+              field = Regexp.last_match(1).downcase
+              header[field] << Regexp.last_match(2).strip
+            when /^\s+(.*?)/om && field
+              header[field][-1] << " " << line.strip
+            else
+              return
+            end
+          end
+          header
         end
       end
 
-      # A case-insensitive Hash class for HTTP header
-      class Header
-        include Enumerable
-
-        def initialize(hash = {})
-          @hash = hash
-          update(hash)
-        end
-
-        def [](key)
-          @hash[key.to_s.capitalize]
-        end
-
-        def []=(key, value)
-          @hash[key.to_s.capitalize] = value
-        end
-
-        def update(hash)
-          hash.each { |k, v| self[k] = v }
-          self
-        end
-
-        def each
-          @hash.each { |k, v| yield k.capitalize, v }
-        end
-
-        def map
-          @hash.map { |k, v| yield k.capitalize, v }
-        end
+      class Header < Hash
+        DEFAULT_HEADER = {
+          "server": SERVER_NAME,
+        }
 
         def to_s
-          export.map do |k, v|
-            "#{k}: #{v}" + CRLF
-          end.join
+          export.map { |k, v| "#{k}: #{v.join(", ")}" + CRLF }.join
         end
 
         private
 
         def export
-          new_header = Header.new(DEFAULT_HEADER.dup)
+          new_header = Header.new
+          new_header.update(DEFAULT_HEADER)
           new_header.update(self)
           new_header["connection"] = "close"
           new_header["date"] = http_time(Time.now)
@@ -98,11 +92,7 @@ module Mooro
         end
       end
 
-      Request = Data.define(:data, :header, :method, :path, :proto) do
-        def content_length
-          header.dig("Content-Length")&.to_i
-        end
-      end
+      Request = Data.define(:data, :header, :method, :path, :proto)
 
       Response = Data.define(:status_code, :status_message, :header, :body) do
         def initialize(
