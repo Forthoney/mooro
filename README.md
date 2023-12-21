@@ -33,9 +33,9 @@ server.stop
 Mooro ships with an implementation of an HTTP Server.
 A [healthcheck server](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
 ```ruby
-Http = Mooro::Impl::Http
+HTTP = Mooro::Impl::HTTP
 
-class HealthCheck < Http::Server
+class HealthCheck < HTTP::Server
   def handle_request(req)
     req.path == "/" ? Http::Response[200] : Http::Response[404]
   end
