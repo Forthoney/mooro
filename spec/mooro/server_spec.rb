@@ -30,14 +30,25 @@ RSpec.describe(Mooro::Server) do
 
       server.stop
     end
+  end
 
-    it "read request" do
+  context "with request" do
+    subject(:server) { repeat_server.new(2, host, port) }
+
+    let(:repeat_server) do
+      Class.new(described_class) do
+        def serve(socket)
+          socket.puts("repeat: #{socket.gets}")
+        end
+      end
+    end
+
+    it "reads request" do
       server.start
       sleep(1)
 
-      client.puts "hello"
-      expect(client.gets.chomp).to(eq("Hello, World!"))
-      client.close
+      client.puts("foobar")
+      expect(client.gets.chomp).to(eq("repeat: foobar"))
 
       server.stop
     end

@@ -90,7 +90,7 @@ module Mooro
           # Rescue any error and move on to next client
           begin
             addr = client.peeraddr
-            logger.send("client #{addr[1]} #{addr[2]}<#{addr[3]}> connect")
+            logger.send("client: #{addr[1]} #{addr[2]}<#{addr[3]}> connect")
             serve.call(client)
           rescue => err
             logger.send([err.to_s, err.backtrace])
