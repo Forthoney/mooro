@@ -20,12 +20,12 @@ module Mooro
 
       def serve(socket)
         # parse first line
-        socket.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, raw_uri, version|
+        socket.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, version|
           header = parse_header(socket)
           return socket << Response[400] if header.nil?
 
           socket.binmode
-          request = Request[socket, header, method, raw_uri, version]
+          request = Request[socket, header, method, path, version]
           response = handle_request(request)
           return socket << response
         end
@@ -55,10 +55,6 @@ module Mooro
       end
 
       class Header < Hash
-        DEFAULT_HEADER = {
-          "server": SERVER_NAME,
-        }
-
         def to_s
           export.map { |k, v| "#{k}: #{v.join(", ")}" + CRLF }.join
         end
@@ -66,11 +62,11 @@ module Mooro
         private
 
         def export
-          new_header = Header.new
-          new_header.update(DEFAULT_HEADER)
+          new_header = Header.new { |h, k| h[k] = [] }
           new_header.update(self)
-          new_header["connection"] = "close"
-          new_header["date"] = http_time(Time.now)
+          new_header["server"] << SERVER_NAME
+          new_header["connection"] << "close"
+          new_header["date"] << http_time(Time.now)
           new_header
         end
 
@@ -79,13 +75,13 @@ module Mooro
         end
       end
 
-      Request = Data.define(:data, :header, :method, :raw_uri, :proto)
+      Request = Data.define(:data, :header, :method, :path, :proto)
 
       Response = Data.define(:status_code, :status_message, :header, :body) do
         def initialize(status_code:, status_message: CODE_MSG[status_code], header: Header.new, body: "") = super
 
         def to_s
-          "#{HTTP_PROTO} #{status_code} #{status_message}#{CRLF}#{header}#{body}"
+          "#{VERSION} #{status_code} #{status_message}#{CRLF}#{header}#{body}"
         end
 
         CODE_MSG = {
