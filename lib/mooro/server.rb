@@ -46,8 +46,8 @@ module Mooro
 
     protected
 
-    def serve(io)
-      io.puts("Hello, World!")
+    def serve(socket)
+      socket.puts("Hello, World!")
     end
 
     # Create a logger Ractor
@@ -89,10 +89,13 @@ module Mooro
           # Failure point 2: server.serve
           # Rescue any error and move on to next client
           begin
+            addr = client.peeraddr
+            logger.send("client #{addr[1]} #{addr[2]}<#{addr[3]}> connect")
             serve.call(client)
           rescue => err
             logger.send([err.to_s, err.backtrace])
           ensure
+            logger.send("client: #{client.peeraddr[1]} disconnect")
             client&.close
           end
         end
@@ -124,6 +127,7 @@ module Mooro
       Thread.new(workers.dup) do |workers|
         logger.send("supervisor start")
         TCPServer.open(@host, @port) do |socket|
+          @port = socket.addr[1]
           logger.send("supervisor socket opened at #{@host}:#{@port}")
 
           loop do

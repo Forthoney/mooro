@@ -26,7 +26,7 @@ module Mooro
 
     def initialize: (Integer max_connections, ?::String host, ?::Integer port, ?IO stdlog) -> void
 
-    def start: () -> Array[Ractor]
+    def start: () -> void
 
     def stop: () -> void
 

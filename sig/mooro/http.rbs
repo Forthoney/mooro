@@ -1,10 +1,10 @@
 module Mooro
-  module Impl
+  module Plugin
     # A rudimentary HTTP server based off of gserver/xmlrpc.rb with
     # bits of WEBRICK sprinkled in where xmlrpc is incorrect
     # It serves more of a demonstration purpose although it can suit
     # small internal applications.
-    module Http
+    module HTTP
       CRLF: ::String
 
       HTTP_PROTO: ::String
@@ -15,15 +15,13 @@ module Mooro
 
       STATUS_CODE_MAPPING: ::Hash[Integer, String]
 
-      class Server < Mooro::Server
-        def serve: (TCPSocket io) -> void
+      def serve: (TCPSocket io) -> void
 
-        def request_handler: (Request request) -> Response
+      def request_handler: (Request request) -> Response
 
-        private
+      private
 
-        def parse_header: (TCPSocket io) -> Header?
-      end
+      def parse_header: (TCPSocket io) -> Header?
 
       class Header < Hash[String, String]
         DEFAULT_HEADER: Hash[String, String]
@@ -41,7 +39,7 @@ module Mooro
         attr_reader data: IO
         attr_reader header: Header
         attr_reader method: String
-        attr_reader path: String
+        attr_reader raw_uri: String
         attr_reader proto: String
 
         def initialize: (IO data, Header header, String method, String path, String proto) -> void

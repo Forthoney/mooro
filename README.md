@@ -4,7 +4,7 @@ Mooro is a Ractor-based, compact, parallel TCP server targeting CRuby. It is bui
 ## Uncompromising Minimalism
 Mooro aims to deliver all essential features expected from a modern Ruby web server such as
 * **Parallelism**. Mooro utilizes true parallelism with CRuby through `Ractor`s.
-* **Logging**. Supervisor start/stop, worker errors, and other notable events are logged by default, and adding additional logging points is as simple as adding `logger.send("message")`.
+* **Logging**. Supervisor start/stop, worker errors, and other notable events are logged by default, and adding additional logging points is as straightforward as adding `logger.send("message")`.
 * **Stopping**. Capable of gracefully stopping (or forcefully, if you prefer that).
 
 At the same time, it abstracts virtually nothing away from TCPServer, enabling maximum extensibility.
@@ -33,11 +33,13 @@ server.stop
 Mooro ships with an implementation of an HTTP Server.
 A [healthcheck server](https://www.mikeperham.com/2023/09/11/ruby-http-server-from-scratch/) can be built with
 ```ruby
-HTTP = Mooro::Impl::HTTP
+HTTP = Mooro::Plugin::HTTP
 
-class HealthCheck < HTTP::Server
+class HealthCheck < Mooro::Server
+  include HTTP
+
   def handle_request(req)
-    req.path == "/" ? Http::Response[200] : Http::Response[404]
+    req.path == "/" ? HTTP::Response[200] : HTTP::Response[404]
   end
 end
 ```
