@@ -48,11 +48,11 @@ end
 
 Install the gem and add to the application's Gemfile by executing:
 
-    $ bundle add UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG
+    $ bundle add mooro
 
 If bundler is not being used to manage dependencies, install the gem by executing:
 
-    $ gem install UPDATE_WITH_YOUR_GEM_NAME_PRIOR_TO_RELEASE_TO_RUBYGEMS_ORG
+    $ gem install mooro
 
 
 
@@ -64,8 +64,12 @@ To install this gem onto your local machine, run `bundle exec rake install`. To 
 
 ## Contributing
 
-Mooro is in desperate need of Tests (both Unit and Integration) and Benchmarks.
-I unfortunately lack the expertise needed for either of these, so any contribution in these areas are greatly appreciated.
+Mooro is in desperate need of **Tests** (both Unit and Integration) and **Benchmarks**.
+I unfortunately lack the expertise needed for thoroughly handling these, so any contribution in these areas are greatly appreciated.
+Furthermore, another, more practicality focused priority is the **rack-ification** of Mooro.
+[Rack](https://github.com/rack/rack) is undoubtedly the gold standard interface for HTTP applications.
+Mooro is technically fully capable of supporting Rack, but the big hurdle currently is properly parsing HTTP requests (yuck).
+
 Contributions outside these areas are, of course, also welcome.
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/Forthoney/mooro. This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [code of conduct](https://github.com/Forthoney/mooro/blob/main/CODE_OF_CONDUCT.md).
