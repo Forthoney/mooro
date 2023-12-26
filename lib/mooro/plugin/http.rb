@@ -1,87 +1,115 @@
 # frozen_string_literal: true
 # shareable_constant_value: literal
 
-require "uri"
+require "protocol/http1"
+require "protocol/rack"
+require "async/http"
 
 require "mooro"
 
 module Mooro
   module Plugin
     module HTTP
+      class Console
+        def initialize(logger)
+          @logger = logger
+        end
+
+        def logger
+          self
+        end
+
+        def info(message, &block)
+          @logger.send("CONSOLE INFO" + message.to_s)
+        end
+
+        def debug(message, &block)
+          @logger.send("CONSOLE DEBUG" + message.to_s)
+        end
+
+        def warn(message, &block)
+          @logger.send("CONSOLE WARN" + message.to_s)
+        end
+
+        def error(message, &block)
+          @logger.send("CONSOLE ERROR" + message.to_s)
+        end
+
+        def fatal(message, &block)
+          @logger.send("CONSOLE FATAL" + message.to_s)
+        end
+      end
+
+      Ractor.make_shareable(Protocol::HTTP::Headers::POLICY)
+
       CRLF = "\r\n"
-      VERSION = "HTTP/1.1"
       SERVER_NAME = "Mooro HttpServer (Ruby #{RUBY_VERSION})"
 
       protected
 
-      def handle_request(request)
-        Response[200]
+      def handle_request(env)
+        [200, {}, ["Hello, World!"]]
       end
 
-      def serve(socket)
-        # parse first line
-        socket.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, version|
-          header = parse_header(socket)
-          return socket << Response[400] if header.nil?
+      def serve(socket, logger)
+        conn = Async::HTTP::Protocol::HTTP1::Connection.new(socket, VERSION)
 
-          socket.binmode
-          request = Request[socket, header, method, path, version]
-          response = handle_request(request)
-          return socket << response
-        end
+        adapt_app = Protocol::Rack::Adapter.new(->(_env) { [200, {}, ["Hello, World!"]] }, Console.new(logger))
 
-        socket << Response[400]
-      end
+        while (request = next_request(conn))
+          response = adapt_app.call(request)
+          body = response.body
 
-      private
+          return if conn.stream.nil? && body.nil? # Full hijack
 
-      def parse_header(socket)
-        # parse HTTP headers
-        header = Header.new { |h, k| h[k] = [] }
-        field = nil
-        while /^(\n|\r)/.match?(line = socket.gets)
-          # Use WEBrick parsing
-          case line
-          when /^([A-Za-z0-9!\#$%&'*+\-.^_`|~]+):(.*?)\z/om
-            field = Regexp.last_match(1).downcase
-            header[field] << Regexp.last_match(2).strip
-          when /^\s+(.*?)/om && field
-            header[field][-1] << " " << line.strip
-          else
-            return
+          begin
+            trailer = response.headers.trailer!
+            conn.write_response(VERSION, response.status, response.headers)
+
+            if body && (protocol = response.protocol)
+              stream = conn.write_upgrade_body(protocol)
+              request = response = nil
+              body.call(stream)
+            elsif request.connect? && response.success?
+              stream = write_tunnel_body(request.version)
+              request = response = nil
+              body.call(stream)
+            else
+              head = request.head?
+              version = request.version
+              request = nil unless request.body
+              response = nil
+
+              conn.write_body(version, body, head, trailer)
+            end
+
+            body = nil
+            request&.each {}
+          rescue => error
+            raise
+          ensure
+            body&.close(error)
           end
         end
-        header
       end
 
-      class Header < Hash
-        def to_s
-          export.map { |k, v| "#{k}: #{v.join(", ")}" + CRLF }.join
+      def next_request(conn)
+        return false unless conn.persistent
+        return false unless (request = Async::HTTP::Protocol::HTTP1::Request.read(conn))
+
+        unless conn.persistent?(request.version, request.method, request.headers)
+          conn.persistent = false
         end
 
-        private
-
-        def export
-          new_header = Header.new { |h, k| h[k] = [] }
-          new_header.update(self)
-          new_header["server"] << SERVER_NAME
-          new_header["connection"] << "close"
-          new_header["date"] << http_time(Time.now)
-          new_header
-        end
-
-        def http_time(time)
-          time.gmtime.strftime("%a, %d %b %Y %H:%M:%S GMT")
-        end
+        request
       end
-
-      Request = Data.define(:data, :header, :method, :path, :proto)
 
       Response = Data.define(:status_code, :status_message, :header, :body) do
-        def initialize(status_code:, status_message: CODE_MSG[status_code], header: Header.new, body: "") = super
+        def initialize(status_code:, status_message: CODE_MSG[status_code], header: {}, body: "") = super
 
         def to_s
-          "#{VERSION} #{status_code} #{status_message}#{CRLF}#{header}#{body}"
+          header_text = header.map { |k, v| "#{k}: #{v}" + CRLF }.join
+          "#{VERSION} #{status_code} #{status_message}#{CRLF}#{header_text}#{body}"
         end
 
         CODE_MSG = {
