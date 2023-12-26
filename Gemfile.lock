@@ -153,6 +153,7 @@ PLATFORMS
   x86_64-linux
 
 DEPENDENCIES
+  async (~> 2.6)
   async-http (~> 0.61.0)
   mooro!
   protocol-http (~> 0.25.0)

@@ -24,3 +24,5 @@ gem "protocol-http1", "~> 0.16.0"
 gem "async-http", "~> 0.61.0"
 
 gem "protocol-rack", "~> 0.4.1"
+
+gem "async", "~> 2.6"
