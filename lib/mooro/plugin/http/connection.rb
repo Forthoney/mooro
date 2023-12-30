@@ -9,35 +9,54 @@ module Mooro
       Ractor.make_shareable(Protocol::Rack::Response::HOP_HEADERS)
 
       class Connection < Protocol::HTTP1::Connection
-        attr_reader :version
-        attr_reader :count
-
-        def initialize(stream, version = VERSION)
+        def initialize(stream, version = "HTTP/1.1")
           super(stream)
           @ready = true
           @version = version
         end
 
-        def http1? = true
-        def http2? = false
-
-        def peer
-          @stream.io
-        end
-
-        def concurrency = 1
-
-        def viable?
-          @ready && @stream&.connected?
-        end
-
-        def reusable?
-          @ready && @persistent && @stream && !@stream.closed?
-        end
-
         def serve_app(app)
           while (request = next_request)
-            serve_request(app, request)
+            response = app.call(request)
+            body = response.body
+
+            return if @stream.nil? && body.nil? # Full hijack
+
+            begin
+              if response
+                version = request.version
+                trailer = response.headers.trailer!
+                write_response(version, response.status, response.headers)
+
+                if body && (protocol = response.protocol)
+                  stream = write_upgrade_body(protocol)
+                  request = response = nil
+
+                  body.call(stream)
+                elsif request.connect? && response.success?
+                  stream = write_tunnel_body(request.version)
+                  request = response = nil
+
+                  body.call(stream)
+                else
+                  head = request.head?
+                  request = nil unless request.body
+                  response = nil
+
+                  write_body(version, body, head, trailer)
+                end
+                body = nil
+              else
+                write_response(version, 500, {})
+                write_body(version, nil)
+              end
+
+              request&.each {}
+            rescue => error
+              raise
+            ensure
+              body&.close(error)
+            end
           end
         end
 
@@ -46,17 +65,17 @@ module Mooro
         def fail_request(status)
           @persistent = false
           write_response(@version, status, {}, nil)
-          write_body(@version, nil)
+          write_body(@verision, nil)
         rescue Errno::ECONNRESET, Errno::EPIPE
         end
 
         def next_request
-          return unless @persistent
+          return false unless @persistent
 
           request_data = read_request
-          return if result.nil?
+          return false if request_data.nil?
 
-          request = Protocol::HTTP::Request.new(self, *request_data)
+          request = Protocol::HTTP::Request.new("http", *request_data, nil)
 
           unless persistent?(request.version, request.method, request.headers)
             @persistent = false
@@ -66,56 +85,6 @@ module Mooro
         rescue
           fail_request(400)
           raise
-        end
-
-        def serve_request(app, request)
-          response = app.call(request)
-          body = response.body
-
-          return if @stream.nil? && body.nil? # Full hijack
-
-          begin
-            if response
-              trailer = response.headers.trailer!
-              write_response(VERSION, response.status, response.headers)
-
-              if body && (protocol = response.protocol)
-                stream = write_upgrade_body(protocol)
-                request = response = nil
-                body.call(stream)
-              elsif request.connect? && response.success?
-                stream = write_tunnel_body(request.version)
-                request = response = nil
-                body.call(stream)
-              else
-                head = request.head?
-                version = request.version
-                request = nil unless request.body
-                response = nil
-
-                write_body(version, body, head, trailer)
-              end
-              body = nil
-            else
-              write_response(VERSION, 500, {})
-              write_body(request.version, nil)
-            end
-
-            request&.each {}
-          rescue => error
-            raise
-          ensure
-            puts body.nil?
-            body&.close(error)
-          end
-        end
-
-        def read_line?
-          @stream.gets(CRLF)
-        end
-
-        def read_line
-          @stream.gets(CRLF) or raise EOFError, "Could not read line!"
         end
       end
     end

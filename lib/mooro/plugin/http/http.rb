@@ -5,40 +5,11 @@ require "protocol/rack"
 
 require "mooro"
 require_relative "connection"
+require_relative "console"
 
 module Mooro
   module Plugin
     module HTTP
-      class Console
-        def initialize(logger)
-          @logger = logger
-        end
-
-        def logger
-          self
-        end
-
-        def info(message, &block)
-          @logger.send("CONSOLE INFO" + message.to_s)
-        end
-
-        def debug(message, &block)
-          @logger.send("CONSOLE DEBUG" + message.to_s)
-        end
-
-        def warn(message, &block)
-          @logger.send("CONSOLE WARN" + message.to_s)
-        end
-
-        def error(message, &block)
-          @logger.send("CONSOLE ERROR" + message.to_s)
-        end
-
-        def fatal(message, &block)
-          @logger.send("CONSOLE FATAL" + message.to_s)
-        end
-      end
-
       CRLF = "\r\n"
       SERVER_NAME = "Mooro HttpServer (Ruby #{RUBY_VERSION})"
 
@@ -49,10 +20,10 @@ module Mooro
       end
 
       def serve(socket, logger)
-        conn = Connection.new(socket, VERSION)
+        conn = Connection.new(socket)
 
-        adapt_app = Protocol::Rack::Adapter.new(->(_env) { [200, {}, ["Hello, World!"]] }, Console.new(logger))
-        conn.serve_app(adapt_app)
+        app = Protocol::Rack::Adapter.new(->(_env) { [200, {}, ["Hello, World!"]] }, Console.new(logger))
+        conn.serve_app(app)
       end
     end
   end
