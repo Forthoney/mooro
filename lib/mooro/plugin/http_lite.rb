@@ -8,165 +8,99 @@ require "mooro"
 
 module Mooro
   module Plugin
-    module HTTP
-      class Connection < Protocol::HTTP1::Connection
-        attr_reader :version
-        attr_reader :count
+    # Naive HTTP 1.1 Server implementation. It does not handle edge cases for requests
+    # and thus is not guaranteed to be correct. It serves more as an example of
+    # how to build a server with Mooro rather than as a proper HTTP Server.
+    #
+    # For an example of a proper HTTP Server, check out the HTTP module instead of
+    # HTTPLite
+    module HTTPLite
+      CRLF = "\r\n"
+      HTTP_VERSION = "HTTP/1.1"
+      SERVER_NAME = "Mooro HTTP Lite (RUBY #{RUBY_VERSION})"
 
-        def initialize(stream, version = VERSION)
-          super(stream)
-          @ready = true
-          @version = version
+      class Server < Mooro::Server
+        protected
+
+        def handle_request(request)
+          Response[200]
         end
 
-        def http1? = true
-        def http2? = false
+        def serve(socket, logger, resources)
+          # parse first line
+          socket.gets&.scan(/^(\S+)\s+(\S+)\s+(\S+)/) do |method, path, version|
+            header = parse_header(socket)
+            return socket << Response[400] if header.nil?
 
-        def peer
-          @stream.io
-        end
-
-        def concurrency = 1
-
-        def viable?
-          @ready && @stream&.connected?
-        end
-
-        def reusable?
-          @ready && @persistent && @stream && !@stream.closed?
-        end
-
-        def serve_app(app)
-          while (request = next_request)
-            serve_request(app, request)
+            socket.binmode
+            request = Request[socket, header, method, path, version]
+            response = handle_request(request)
+            return socket << response
           end
+
+          socket << Response[400]
         end
 
         private
 
-        def fail_request(status)
-          @persistent = false
-          write_response(@version, status, {}, nil)
-          write_body(@version, nil)
-        rescue Erro::ECONNRESET, Errno::EPIPE
-        end
-
-        def next_request
-          return unless @persistent
-
-          request_data = read_request
-          return if result.nil?
-
-          request = Protocol::HTTP::Request.new("http", *request_data)
-
-          unless persistent?(request.version, request.method, request.headers)
-            @persistent = false
-          end
-
-          request
-        rescue
-          fail_request(400)
-          raise
-        end
-
-        def serve_request(app, request)
-          response = app.call(request)
-          body = response.body
-
-          return if @stream.nil? && body.nil? # Full hijack
-
-          begin
-            if response
-              trailer = response.headers.trailer!
-              write_response(VERSION, response.status, response.headers)
-
-              if body && (protocol = response.protocol)
-                stream = write_upgrade_body(protocol)
-                request = response = nil
-                body.call(stream)
-              elsif request.connect? && response.success?
-                stream = write_tunnel_body(request.version)
-                request = response = nil
-                body.call(stream)
-              else
-                head = request.head?
-                version = request.version
-                request = nil unless request.body
-                response = nil
-
-                write_body(version, body, head, trailer)
-              end
-              body = nil
+        def parse_header(socket)
+          # parse HTTP headers
+          header = Header.new { |h, k| h[k] = [] }
+          field = nil
+          while /^(\n|\r)/.match?(line = socket.gets)
+            # Use WEBrick parsing
+            case line
+            when /^([A-Za-z0-9!\#$%&'*+\-.^_`|~]+):(.*?)\z/om
+              field = Regexp.last_match(1).downcase
+              header[field] << Regexp.last_match(2).strip
+            when /^\s+(.*?)/om && field
+              header[field][-1] << " " << line.strip
             else
-              write_response(VERSION, 500, {})
-              write_body(request.version, nil)
+              return
             end
-
-            request&.each {}
-          rescue => error
-            raise
-          ensure
-            puts body.nil?
-            body&.close(error)
           end
-        end
-
-        def read_line?
-          @stream.read_until(CRLF)
-        end
-
-        def read_line
-          @stream.read_line(CRFL) or raise EOFError, "Could not read line!"
+          header
         end
       end
 
-      class Console
-        def initialize(logger)
-          @logger = logger
+      class Header < Hash
+        def to_s
+          export.map { |k, v| "#{k}: #{v.join(", ")}" + CRLF }.join
         end
 
-        def logger
-          self
+        private
+
+        def export
+          new_header = Header.new { |h, k| h[k] = [] }
+          new_header.update(self)
+          new_header["server"] << SERVER_NAME
+          new_header["connection"] << "close"
+          new_header["date"] << http_time(Time.now)
+          new_header
         end
 
-        def info(message, &block)
-          @logger.send("CONSOLE INFO" + message.to_s)
-        end
-
-        def debug(message, &block)
-          @logger.send("CONSOLE DEBUG" + message.to_s)
-        end
-
-        def warn(message, &block)
-          @logger.send("CONSOLE WARN" + message.to_s)
-        end
-
-        def error(message, &block)
-          @logger.send("CONSOLE ERROR" + message.to_s)
-        end
-
-        def fatal(message, &block)
-          @logger.send("CONSOLE FATAL" + message.to_s)
+        def http_time(time)
+          time.gmtime.strftime("%a, %d %b %Y %H:%M:%S GMT")
         end
       end
 
-      Ractor.make_shareable(Protocol::HTTP::Headers::POLICY)
-      Ractor.make_shareable(Protocol::Rack::Response::HOP_HEADERS)
+      Request = Data.define(:data, :header, :method, :path, :proto)
 
-      CRLF = "\r\n"
-      SERVER_NAME = "Mooro HttpServer (Ruby #{RUBY_VERSION})"
+      Response = Data.define(:status_code, :status_message, :header, :body) do
+        def initialize(status_code:, status_message: CODE_MSG[status_code], header: Header.new, body: "") = super
 
-      protected
+        def to_s
+          "#{VERSION} #{status_code} #{status_message}#{CRLF}#{header}#{body}"
+        end
 
-      def handle_request(env)
-        [200, {}, ["Hello, World!"]]
-      end
-
-      def serve(socket, logger)
-        conn = Connection.new(socket, VERSION)
-
-        adapt_app = Protocol::Rack::Adapter.new(->(_env) { [200, {}, ["Hello, World!"]] }, Console.new(logger))
-        conn.serve_app(adapt_app)
+        CODE_MSG = {
+          200 => "OK",
+          400 => "Bad Request",
+          403 => "Forbidden",
+          405 => "Method Not Allowed",
+          411 => "Length Required",
+          500 => "Internal Server Error",
+        }
       end
     end
   end

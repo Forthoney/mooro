@@ -23,7 +23,7 @@ module Mooro
 
       @logger = make_logger
       @workers = @max_connections.times.map do |i|
-        make_worker(Ractor.current, @logger, ractor_name: "worker-#{i}")
+        make_worker(Ractor.current, ractor_name: "worker-#{i}")
       end
       @supervisor = make_supervisor(@logger, @workers)
       @shutdown = false
@@ -46,7 +46,7 @@ module Mooro
 
     protected
 
-    def serve(socket)
+    def serve(socket, logger, resources)
       socket.puts("Hello, World!")
     end
 
@@ -79,8 +79,14 @@ module Mooro
     # Termination:
     # Workers do not stop while the supervisor is alive unless explicitly told to
     def make_worker(supervisor, logger, ractor_name: "worker")
-      block = Ractor.make_shareable(method(:serve).to_proc)
-      Ractor.new(supervisor, logger, block, name: ractor_name) do |supervisor, logger, serve|
+      serve_proc = Ractor.make_shareable(method(:serve).to_proc)
+      Ractor.new(
+        supervisor,
+        logger,
+        serve_proc,
+        worker_resources,
+        name: ractor_name,
+      ) do |supervisor, logger, serve, resources|
         # Failure point 1: supervisor.take
         # - ClosedError: supervisor is already dead
         # - RemoteError: supervisor raised some unhandled error
@@ -91,7 +97,7 @@ module Mooro
           begin
             addr = client.peeraddr
             logger.send("client: #{addr[1]} #{addr[2]}<#{addr[3]}> connect")
-            serve.call(client, logger)
+            serve.call(client, resources)
           rescue => err
             logger.send([err.to_s, err.backtrace])
           ensure
@@ -117,7 +123,7 @@ module Mooro
     # joining with all child ractors. This is becausee workers are guaranteed to
     # survive as long as the supervisor too is alive and well.
     #
-    # Termination
+    # Termination:
     # Any other error will trigger a "non-graceful" termination.
     # We do not know if any child ractors are in a blocking state, so we cannot
     # yield or take from any of them without risk of blocking the supervisor.
@@ -150,5 +156,9 @@ module Mooro
         logger.take
       end
     end
+
+    # Resources to be passed to the worker. All values must be shareable or made
+    # shareable
+    def worker_resources = {}
   end
 end
