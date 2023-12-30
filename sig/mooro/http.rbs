@@ -15,7 +15,7 @@ module Mooro
 
       STATUS_CODE_MAPPING: ::Hash[Integer, String]
 
-      def serve: (TCPSocket io) -> void
+      def serve: (TCPSocket io, Ractor logger, Hash[Symbol, untyped]) -> void
 
       def request_handler: (Request request) -> Response
 

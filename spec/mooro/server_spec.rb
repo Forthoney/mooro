@@ -4,6 +4,7 @@ require "socket"
 require "stringio"
 
 RSpec.describe(Mooro::Server) do
+  let(:server) { described_class.new(2) }
   let(:host) { "127.0.0.1" }
   let(:port) { 8080 }
   let(:client) { TCPSocket.new(host, port, connect_timeout: 2) }
@@ -37,9 +38,7 @@ RSpec.describe(Mooro::Server) do
 
     let(:repeat_server) do
       Class.new(described_class) do
-        def serve(socket)
-          socket.puts("repeat: #{socket.gets}")
-        end
+        def serve(socket, _, _) = socket.puts("repeat: #{socket.gets}")
       end
     end
 

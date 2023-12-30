@@ -23,7 +23,7 @@ module Mooro
 
       @logger = make_logger
       @workers = @max_connections.times.map do |i|
-        make_worker(Ractor.current, ractor_name: "worker-#{i}")
+        make_worker(Ractor.current, @logger, ractor_name: "worker-#{i}")
       end
       @supervisor = make_supervisor(@logger, @workers)
       @shutdown = false
@@ -97,7 +97,7 @@ module Mooro
           begin
             addr = client.peeraddr
             logger.send("client: #{addr[1]} #{addr[2]}<#{addr[3]}> connect")
-            serve.call(client, resources)
+            serve.call(client, logger, resources)
           rescue => err
             logger.send([err.to_s, err.backtrace])
           ensure

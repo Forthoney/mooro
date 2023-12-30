@@ -5,9 +5,6 @@ require "protocol/http1"
 module Mooro
   module Plugin
     module HTTP
-      Ractor.make_shareable(Protocol::HTTP::Headers::POLICY)
-      Ractor.make_shareable(Protocol::Rack::Response::HOP_HEADERS)
-
       class Connection < Protocol::HTTP1::Connection
         def initialize(stream, version = "HTTP/1.1")
           super(stream)
