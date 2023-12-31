@@ -18,6 +18,9 @@ module Mooro
       @shutdown = true
     end
 
+    # Start the server. If all goes well, the TCPServer socket is guaranteed
+    # to be open when this method returns. If some error occurs, an error will
+    # be thrown
     def start
       raise "server is already running" unless @shutdown
 
@@ -130,17 +133,18 @@ module Mooro
     # So, the supervisor does not attempt to join.
     def make_supervisor(logger, workers)
       # Dupe workers array because we mutate it when stopping
-      Thread.new(workers.dup) do |workers|
+      Thread.new(workers.dup, @host, @port) do |workers, host, port|
         logger.send("supervisor start")
-        TCPServer.open(@host, @port) do |socket|
-          @port = socket.addr[1]
-          logger.send("supervisor socket opened at #{@host}:#{@port}")
+
+        TCPServer.open(host, port) do |socket|
+          port = socket.addr[1]
+          logger.send("supervisor socket opened at #{host}:#{port}")
 
           loop do
             client = socket.accept
             Ractor.yield(client, move: true)
           rescue TerminateServer
-            logger.send("supervisor at #{@host}:#{@port} gracefully stopping...")
+            logger.send("supervisor at #{host}:#{port} gracefully stopping...")
             # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
             until workers.empty?
               Ractor.yield(:terminate)
@@ -150,15 +154,15 @@ module Mooro
             break
           end
         rescue => unexpected_err
-          logger.send("supervisor at #{@host}:#{@port} crashed with #{unexpected_err}")
+          logger.send("supervisor at #{host}:#{port} crashed with #{unexpected_err}")
         end
         logger.send(:terminate)
-        logger.take
+        logger.take # join with logger
       end
     end
 
     # Resources to be passed to the worker. All values must be shareable or made
-    # shareable
+    # shareable. The default server doesn't pass anything additional to the worker
     def worker_resources = {}
   end
 end
