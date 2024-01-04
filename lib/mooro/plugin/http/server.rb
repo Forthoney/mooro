@@ -13,6 +13,9 @@ module Mooro
       CRLF = "\r\n"
       SERVER_NAME = "Mooro HTTP::Server (Ruby #{RUBY_VERSION})"
 
+      Ractor.make_shareable(Protocol::HTTP::Headers::POLICY)
+      Ractor.make_shareable(Protocol::Rack::Response::HOP_HEADERS)
+
       class Server < Mooro::Server
         protected
 
