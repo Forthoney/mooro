@@ -3,6 +3,7 @@
 module Mooro
   module Plugin
     module HTTP
+      # Console wrapper for the logger ractor
       class Console
         def initialize(logger)
           @logger = logger

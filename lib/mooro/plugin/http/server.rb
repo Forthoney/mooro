@@ -25,7 +25,6 @@ module Mooro
 
         def serve(socket, logger, resources)
           conn = Connection.new(socket)
-
           app = Protocol::Rack::Adapter.new(resources[:app], Console.new(logger))
           conn.serve_app(app)
         end
