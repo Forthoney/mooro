@@ -6,10 +6,12 @@ module Mooro
   class TerminateServer < StandardError; end
 
   class Server
-    def initialize(max_connections,
+    def initialize(
+      max_connections,
       host = "127.0.0.1",
       port = 10001,
-      stdlog = $stderr)
+      stdlog = $stderr
+    )
 
       @host = host
       @port = port
@@ -134,17 +136,17 @@ module Mooro
     def make_supervisor(logger, workers)
       # Dupe workers array because we mutate it when stopping
       Thread.new(workers.dup, @host, @port) do |workers, host, port|
-        logger.send("supervisor start")
+        logger.send("supervisor starting...")
 
         TCPServer.open(host, port) do |socket|
           port = socket.addr[1]
-          logger.send("supervisor socket opened at #{host}:#{port}")
+          logger.send("supervisor successfully started at http://#{host}:#{port}")
 
           loop do
             client = socket.accept
             Ractor.yield(client, move: true)
           rescue TerminateServer
-            logger.send("supervisor at #{host}:#{port} gracefully stopping...")
+            logger.send("supervisor gracefully stopping...")
             # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
             until workers.empty?
               Ractor.yield(:terminate)
@@ -154,7 +156,7 @@ module Mooro
             break
           end
         rescue => unexpected_err
-          logger.send("supervisor at #{host}:#{port} crashed with #{unexpected_err}")
+          logger.send("supervisor at crashed with #{unexpected_err}")
         end
         logger.send(:terminate)
         logger.take # join with logger
