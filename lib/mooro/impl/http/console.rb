@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module Mooro
-  module Plugin
+  module Impl 
     module HTTP
       # Console wrapper for the logger ractor
       class Console

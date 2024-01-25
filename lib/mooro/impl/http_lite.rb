@@ -7,7 +7,7 @@ require "protocol/rack"
 require "mooro"
 
 module Mooro
-  module Plugin
+  module Impl
     # Naive HTTP 1.1 Server implementation. It does not handle edge cases for requests
     # and thus is not guaranteed to be correct. It serves more as an example of
     # how to build a server with Mooro rather than as a proper HTTP Server.

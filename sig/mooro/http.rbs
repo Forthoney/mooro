@@ -1,5 +1,5 @@
 module Mooro
-  module Plugin
+  module Impl
     # A rudimentary HTTP server based off of gserver/xmlrpc.rb with
     # bits of WEBRICK sprinkled in where xmlrpc is incorrect
     # It serves more of a demonstration purpose although it can suit

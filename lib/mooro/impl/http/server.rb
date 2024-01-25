@@ -7,7 +7,7 @@ require_relative "connection"
 require_relative "console"
 
 module Mooro
-  module Plugin
+  module Impl
     module HTTP
       CRLF = "\r\n"
       SERVER_NAME = "Mooro HTTP::Server (Ruby #{RUBY_VERSION})"

@@ -3,7 +3,7 @@
 require "protocol/http1"
 
 module Mooro
-  module Plugin
+  module Impl 
     module HTTP
       class Connection < Protocol::HTTP1::Connection
         def initialize(stream, version = "HTTP/1.1")
