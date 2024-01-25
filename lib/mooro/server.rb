@@ -27,9 +27,7 @@ module Mooro
       raise "server is already running" unless @shutdown
 
       @logger = make_logger
-      @workers = @max_connections.times.map do |i|
-        make_worker(Ractor.current, @logger, ractor_name: "worker-#{i}")
-      end
+      @workers = make_worker_pool
       @supervisor = make_supervisor(@logger, @workers)
       @shutdown = false
     end
@@ -74,6 +72,15 @@ module Mooro
       end
     end
 
+    def make_worker_pool
+      serve_proc = Ractor.make_shareable(method(:serve).to_proc)
+      resources = Ractor.make_shareable(worker_resources)
+
+      @max_connections.times.map do |i|
+        make_worker(serve_proc, resources, name: "worker-#{i}")
+      end
+    end
+
     # Create a worker Ractor
     # supervisor >---- worker ----> logger
     #
@@ -83,14 +90,13 @@ module Mooro
     #
     # Termination:
     # Workers do not stop while the supervisor is alive unless explicitly told to
-    def make_worker(supervisor, logger, ractor_name: "worker")
-      serve_proc = Ractor.make_shareable(method(:serve).to_proc)
+    def make_worker(serve_proc, worker_resources, name: "worker")
       Ractor.new(
-        supervisor,
-        logger,
+        Ractor.current,
+        @logger,
         serve_proc,
         worker_resources,
-        name: ractor_name,
+        name:,
       ) do |supervisor, logger, serve, resources|
         # Failure point 1: supervisor.take
         # - ClosedError: supervisor is already dead

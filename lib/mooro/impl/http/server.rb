@@ -3,7 +3,6 @@
 
 require "protocol/rack"
 
-require "mooro"
 require_relative "connection"
 require_relative "console"
 

@@ -6,15 +6,14 @@ require "mooro/server"
 module Mooro
   module Plugin
     module InterruptableWorker
-      def make_worker(supervisor, logger, ractor_name: "interruptable_worker")
-        serve_proc = Ractor.make_shareable(method(:serve).to_proc)
+      def make_worker(serve_proc, worker_resources, name: "interruptable_worker")
         Ractor.new(
-          supervisor,
-          logger,
+          Ractor.current,
+          @logger,
           serve_proc,
           worker_resources,
-          name: ractor_name,
-        ) do |supervisor, logger, serve, _resources|
+          name:,
+        ) do |supervisor, logger, serve, resources|
           clients = Thread::Queue.new
           runner = Thread.new do
             while (current_client = clients.pop)
@@ -29,6 +28,7 @@ module Mooro
               end
             end
           end
+
           begin
             until (client = supervisor.take) == :terminate
               clients.push(client)

@@ -18,6 +18,8 @@ group :test do
 end
 
 # Only need these gems when intending to use the full HTTP capabilities
-gem "protocol-http", "~> 0.25.0"
-gem "protocol-http1", "~> 0.16.0"
-gem "protocol-rack", git: "https://github.com/forthoney/protocol-rack", branch: "console-switch"
+group :http, optional: true do
+  gem "protocol-http1", "~> 0.16.0"
+  # Need to apply console patch
+  gem "protocol-rack", git: "https://github.com/forthoney/protocol-rack", branch: "console-switch"
+end
