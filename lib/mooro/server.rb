@@ -28,7 +28,7 @@ module Mooro
 
       @logger = make_logger
       @workers = make_worker_pool
-      @supervisor = make_supervisor(@logger, @workers)
+      @supervisor = make_supervisor
       @shutdown = false
     end
 
@@ -139,9 +139,9 @@ module Mooro
     # We do not know if any child ractors are in a blocking state, so we cannot
     # yield or take from any of them without risk of blocking the supervisor.
     # So, the supervisor does not attempt to join.
-    def make_supervisor(logger, workers)
+    def make_supervisor
       # Dupe workers array because we mutate it when stopping
-      Thread.new(workers.dup, @host, @port) do |workers, host, port|
+      Thread.new(@logger, @workers.dup, @host, @port) do |logger, workers, host, port|
         logger.send("supervisor starting...")
 
         TCPServer.open(host, port) do |socket|

@@ -1,0 +1,17 @@
+module Mooro
+  module Impl
+    module HTTP
+      CRLF: ::String
+
+      SERVER_NAME: untyped
+
+      class Server < Mooro::Server
+        def handle_request: (untyped env) -> ::Array[200 | ::Hash[untyped, untyped] | ::Array["Hello, World!"]]
+
+        def serve: (untyped socket, untyped logger, untyped resources) -> untyped
+
+        def worker_resources: () -> { app: untyped }
+      end
+    end
+  end
+end

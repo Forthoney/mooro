@@ -2,6 +2,8 @@
 
 require "protocol/http1"
 
+# from https://github.com/socketry/async-http/blob/main/lib/async/http/protocol/http1/server.rb
+
 module Mooro
   module Impl 
     module HTTP
