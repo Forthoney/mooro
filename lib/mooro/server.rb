@@ -1,6 +1,10 @@
 # frozen_string_literal: true
 
 require "socket"
+require "async"
+require "async/http/server"
+require "async/http/endpoint"
+require_relative "console"
 
 module Mooro
   class TerminateServer < StandardError; end
@@ -8,13 +12,11 @@ module Mooro
   class Server
     def initialize(
       max_connections,
-      host = "127.0.0.1",
-      port = 10001,
+      endpoint = "http://127.0.0.1:10001",
       stdlog = $stderr
     )
 
-      @host = host
-      @port = port
+      @endpoint = Async::HTTP::Endpoint.parse(endpoint)
       @max_connections = max_connections
       @stdlog = stdlog
       @shutdown = true
@@ -139,34 +141,49 @@ module Mooro
     # We do not know if any child ractors are in a blocking state, so we cannot
     # yield or take from any of them without risk of blocking the supervisor.
     # So, the supervisor does not attempt to join.
+    def app(env)
+      [200, {}, ["Hello, World!"]]
+    end
+
+    def send_to_worker(request)
+      adapter =  Protocol::Rack::Adapter.new(Ractor.make_shareable(self.method(:app).to_proc), Impl::HTTP::Console.new(@logger))
+      Ractor.yield(adapter)
+    end
+
     def make_supervisor
-      # Dupe workers array because we mutate it when stopping
-      Thread.new(@logger, @workers.dup, @host, @port) do |logger, workers, host, port|
-        logger.send("supervisor starting...")
-
-        TCPServer.open(host, port) do |socket|
-          port = socket.addr[1]
-          logger.send("supervisor successfully started at http://#{host}:#{port}")
-
-          loop do
-            client = socket.accept
-            Ractor.yield(client, move: true)
-          rescue TerminateServer
-            logger.send("supervisor gracefully stopping...")
-            # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
-            until workers.empty?
-              Ractor.yield(:terminate)
-              r, _ = Ractor.select(*workers)
-              workers.delete(r)
-            end
-            break
-          end
-        rescue => unexpected_err
-          logger.send("supervisor at crashed with #{unexpected_err}")
+      server = Async::HTTP::Server.new(self.method(:send_to_worker), @endpoint)
+      Async do |task|
+        server_task = task.async do 
+          server.run
         end
-        logger.send(:terminate)
-        logger.take # join with logger
       end
+      # Dupe workers array because we mutate it when stopping
+      # Thread.new(@logger, @workers.dup, @host, @port) do |logger, workers, host, port|
+      #   logger.send("supervisor starting...")
+      #
+      #   TCPServer.open(host, port) do |socket|
+      #     port = socket.addr[1]
+      #     logger.send("supervisor successfully started at http://#{host}:#{port}")
+      #
+      #     loop do
+      #       client = socket.accept
+      #       Ractor.yield(client, move: true)
+      #     rescue TerminateServer
+      #       logger.send("supervisor gracefully stopping...")
+      #       # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
+      #       until workers.empty?
+      #         Ractor.yield(:terminate)
+      #         r, _ = Ractor.select(*workers)
+      #         workers.delete(r)
+      #       end
+      #       break
+      #     end
+      #   rescue => unexpected_err
+      #     logger.send("supervisor at crashed with #{unexpected_err}")
+      #   end
+      #   logger.send(:terminate)
+      #   logger.take # join with logger
+      # end
     end
 
     # Resources to be passed to the worker. All values must be shareable or made

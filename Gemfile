@@ -21,5 +21,7 @@ end
 group :http, optional: true do
   gem "protocol-http1", "~> 0.16.0"
   # Need to apply console patch
-  gem "protocol-rack", git: "https://github.com/forthoney/protocol-rack", branch: "console-switch"
 end
+
+gem "async-http", "~> 0.62.0"
+gem "protocol-rack", git: "https://github.com/forthoney/protocol-rack", branch: "console-switch"
