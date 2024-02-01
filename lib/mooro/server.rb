@@ -5,6 +5,7 @@ require "async"
 require "async/http/server"
 require "async/http/endpoint"
 require_relative "console"
+require_relative "adapter"
 
 module Mooro
   class TerminateServer < StandardError; end
@@ -75,11 +76,11 @@ module Mooro
     end
 
     def make_worker_pool
-      serve_proc = Ractor.make_shareable(method(:serve).to_proc)
+      app_proc = Ractor.make_shareable(method(:app).to_proc)
       resources = Ractor.make_shareable(worker_resources)
 
       @max_connections.times.map do |i|
-        make_worker(serve_proc, resources, name: "worker-#{i}")
+        make_worker(app_proc, resources, name: "worker-#{i}")
       end
     end
 
@@ -92,30 +93,25 @@ module Mooro
     #
     # Termination:
     # Workers do not stop while the supervisor is alive unless explicitly told to
-    def make_worker(serve_proc, worker_resources, name: "worker")
+    def make_worker(app_proc, worker_resources, name: "worker")
       Ractor.new(
         Ractor.current,
         @logger,
-        serve_proc,
+        app_proc,
         worker_resources,
         name:,
-      ) do |supervisor, logger, serve, resources|
+      ) do |supervisor, logger, app, resources|
         # Failure point 1: supervisor.take
         # - ClosedError: supervisor is already dead
         # - RemoteError: supervisor raised some unhandled error
         # Neither are really recoverable...
-        until (client = supervisor.take) == :terminate
+        until (request = supervisor.take) == :terminate
           # Failure point 2: server.serve
           # Rescue any error and move on to next client
           begin
-            addr = client.peeraddr
-            logger.send("client: #{addr[1]} #{addr[2]}<#{addr[3]}> connect")
-            serve.call(client, logger, resources)
+            app.call(msg)
           rescue => err
             logger.send([err.to_s, err.backtrace])
-          ensure
-            logger.send("client: #{client.peeraddr[1]} disconnect")
-            client&.close
           end
         end
       rescue Ractor::ClosedError => closed_err
@@ -146,8 +142,9 @@ module Mooro
     end
 
     def send_to_worker(request)
-      adapter =  Protocol::Rack::Adapter.new(Ractor.make_shareable(self.method(:app).to_proc), Impl::HTTP::Console.new(@logger))
-      Ractor.yield(adapter)
+      env = Adapter.new.make_environment(request)
+      binding.irb
+      Ractor.yield(request, move: true)
     end
 
     def make_supervisor

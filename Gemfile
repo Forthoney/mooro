@@ -24,4 +24,4 @@ group :http, optional: true do
 end
 
 gem "async-http", "~> 0.62.0"
-gem "protocol-rack", git: "https://github.com/forthoney/protocol-rack", branch: "console-switch"
+gem "protocol-rack"
