@@ -25,3 +25,7 @@ end
 
 gem "async-http", "~> 0.62.0"
 gem "protocol-rack"
+
+gem "debug", "~> 1.9"
+
+gem "ractor-tvar", "~> 0.4.0"

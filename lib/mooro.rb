@@ -4,5 +4,5 @@ require "mooro/version"
 require "mooro/server"
 
 module Mooro
-  # Your code goes here...
+  Ractor.make_shareable(Protocol::Rack::Response::HOP_HEADERS)
 end

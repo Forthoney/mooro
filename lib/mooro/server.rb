@@ -1,11 +1,12 @@
 # frozen_string_literal: true
 
-require "socket"
 require "async"
 require "async/http/server"
 require "async/http/endpoint"
-require_relative "console"
+require "ractor/tvar"
 require_relative "adapter"
+require_relative "message"
+require_relative "worker"
 
 module Mooro
   class TerminateServer < StandardError; end
@@ -52,10 +53,6 @@ module Mooro
 
     protected
 
-    def serve(socket, logger, resources)
-      socket.puts("Hello, World!")
-    end
-
     # Create a logger Ractor
     # workers & supervisor ----> logger
     #
@@ -76,12 +73,12 @@ module Mooro
     end
 
     def make_worker_pool
-      app_proc = Ractor.make_shareable(method(:app).to_proc)
-      resources = Ractor.make_shareable(worker_resources)
+      app = Ractor.make_shareable(method(:app).to_proc)
 
       @max_connections.times.map do |i|
-        make_worker(app_proc, resources, name: "worker-#{i}")
-      end
+        worker = Worker.new(@logger, app, name: "worker-#{i}")
+        [worker.ractor, worker]
+      end.to_h
     end
 
     # Create a worker Ractor
@@ -93,31 +90,6 @@ module Mooro
     #
     # Termination:
     # Workers do not stop while the supervisor is alive unless explicitly told to
-    def make_worker(app_proc, worker_resources, name: "worker")
-      Ractor.new(
-        Ractor.current,
-        @logger,
-        app_proc,
-        worker_resources,
-        name:,
-      ) do |supervisor, logger, app, resources|
-        # Failure point 1: supervisor.take
-        # - ClosedError: supervisor is already dead
-        # - RemoteError: supervisor raised some unhandled error
-        # Neither are really recoverable...
-        until (request = supervisor.take) == :terminate
-          # Failure point 2: server.serve
-          # Rescue any error and move on to next client
-          begin
-            app.call(msg)
-          rescue => err
-            logger.send([err.to_s, err.backtrace])
-          end
-        end
-      rescue Ractor::ClosedError => closed_err
-        logger.send("#{closed_err}: Supervisor's outgoing port is closed")
-      end
-    end
 
     # Create a supervisor Ractor
     #
@@ -141,50 +113,28 @@ module Mooro
       [200, {}, ["Hello, World!"]]
     end
 
-    def send_to_worker(request)
-      env = Adapter.new.make_environment(request)
-      binding.irb
-      Ractor.yield(request, move: true)
-    end
-
     def make_supervisor
-      server = Async::HTTP::Server.new(self.method(:send_to_worker), @endpoint)
+      server = Async::HTTP::Server.new(method(:serve_request), @endpoint)
       Async do |task|
-        server_task = task.async do 
+        task.async do
           server.run
         end
       end
-      # Dupe workers array because we mutate it when stopping
-      # Thread.new(@logger, @workers.dup, @host, @port) do |logger, workers, host, port|
-      #   logger.send("supervisor starting...")
-      #
-      #   TCPServer.open(host, port) do |socket|
-      #     port = socket.addr[1]
-      #     logger.send("supervisor successfully started at http://#{host}:#{port}")
-      #
-      #     loop do
-      #       client = socket.accept
-      #       Ractor.yield(client, move: true)
-      #     rescue TerminateServer
-      #       logger.send("supervisor gracefully stopping...")
-      #       # Consider changing to push-only once round-robin scheduling is implemented in Ractor.select
-      #       until workers.empty?
-      #         Ractor.yield(:terminate)
-      #         r, _ = Ractor.select(*workers)
-      #         workers.delete(r)
-      #       end
-      #       break
-      #     end
-      #   rescue => unexpected_err
-      #     logger.send("supervisor at crashed with #{unexpected_err}")
-      #   end
-      #   logger.send(:terminate)
-      #   logger.take # join with logger
-      # end
     end
 
-    # Resources to be passed to the worker. All values must be shareable or made
-    # shareable. The default server doesn't pass anything additional to the worker
-    def worker_resources = {}
+    def serve_request(request)
+      env = Adapter.new.make_environment(request)
+      shareable_env = env.dup.filter { |_, v| Ractor.shareable?(v) }
+      worker_ractor = Ractor.receive_if { |msg| msg.is_a?(Ractor) }
+
+      puts "ask"
+      case @workers[worker_ractor].ask(shareable_env)
+      in Message::Answer(response)
+        puts "answer"
+        return response
+      else
+        raise "Response failed"
+      end
+    end
   end
 end
