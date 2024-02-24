@@ -173,6 +173,7 @@ DEPENDENCIES
   mooro!
   protocol-http1 (~> 0.16.0)
   protocol-rack
+  rack (~> 3.0)
   ractor-tvar (~> 0.4.0)
   rake (~> 13.0)
   rspec (~> 3.0)

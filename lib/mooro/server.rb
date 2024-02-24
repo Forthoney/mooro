@@ -110,7 +110,6 @@ module Mooro
     # yield or take from any of them without risk of blocking the supervisor.
     # So, the supervisor does not attempt to join.
     def app(env)
-      sleep(10)
       [200, {}, ["Hello, World!"]]
     end
 
@@ -125,13 +124,16 @@ module Mooro
 
     def serve_request(request)
       env = Adapter.new.make_environment(request)
-      shareable_env = env.dup.filter { |_, v| Ractor.shareable?(v) }
+      env = env.reject do |k, _|
+        ["protocol.http.request", "rack.hijack"].include?(k)
+      end.transform_values do |v|
+        Ractor.make_shareable(v)
+      end
+
       worker_ractor = Ractor.receive_if { |msg| msg.is_a?(Ractor) }
 
-      puts "ask"
-      case @workers[worker_ractor].ask(shareable_env)
+      case @workers[worker_ractor].ask(env)
       in Message::Answer(response)
-        puts "answer"
         return response
       else
         raise "Response failed"

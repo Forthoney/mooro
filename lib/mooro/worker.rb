@@ -48,7 +48,7 @@ module Mooro
     def initialize(logger, app, name:)
       @completed = Ractor::TVar.new(0)
       @prev_completed = 0
-      @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, logger, app, completed|
+      @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, _logger, app, completed|
         answer_loop(supervisor) do |env|
           status, fields, body = app.call(env)
 
