@@ -110,6 +110,7 @@ module Mooro
     # yield or take from any of them without risk of blocking the supervisor.
     # So, the supervisor does not attempt to join.
     def app(env)
+      sleep(10)
       [200, {}, ["Hello, World!"]]
     end
 
