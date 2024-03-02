@@ -6,13 +6,24 @@ require "ractor/tvar"
 require_relative "message"
 
 module Mooro
+  # Utilities for use in Worker
   module WorkerUtil
+    # Due to Ractor sharing constraints, if there is a function you know
+    # ahead of time that you know you'll want to use inside the Ractor,
+    # it's best to add it as a refinement rather than passing it in the Ractor
+    # as a proc
     refine Ractor do
       private
 
-      def answer_loop(questioner, &block)
+      # Runs an event-loop where the current Ractor repeatedly receives
+      # "questions" from the questioner, and yields a response.
+      # It also informs the questioner when the Ractor is ready for a new response
+      # @param questioner [Ractor] The Ractor sending questions to current Ractor
+      # @param notify [Boolean] Whether to notify the questioner when done
+      # @return [Void]
+      def answer_loop(questioner, notify: true, &block)
         loop do
-          questioner.send(Ractor.current) # ME! I'm ready for a new question!
+          questioner.send(Ractor.current) if notify # ME! I'm ready for a new question!
           case Ractor.receive
           in Message::Terminate
             break
@@ -40,9 +51,8 @@ module Mooro
     end
   end
 
-
   class Worker
-    using WorkerUtil
+    using RactorUtil
 
     attr_reader :ractor
 
@@ -64,6 +74,13 @@ module Mooro
       end
     end
 
+    # Ask this Worker a question and receive a response
+    # Asynchronously yields while the response is not ready
+    # @see #question_loop
+    # @param question [Object]
+    # @param logger [Ractor]
+    # @param task [Async::Task]
+    # @return [Object]
     def ask(question, logger, task: Async::Task.current)
       @ractor.send(Message::Question[question])
 

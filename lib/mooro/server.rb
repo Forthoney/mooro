@@ -12,6 +12,10 @@ module Mooro
   class TerminateServer < StandardError; end
 
   class Server
+    using RactorUtil
+
+    attr_reader :runnin
+
     def initialize(
       max_connections,
       endpoint = "http://127.0.0.1:10001",
@@ -21,57 +25,38 @@ module Mooro
       @endpoint = Async::HTTP::Endpoint.parse(endpoint)
       @max_connections = max_connections
       @stdlog = stdlog
-      @shutdown = true
+      @running = false
     end
 
-    # Start the server. If all goes well, the TCPServer socket is guaranteed
-    # to be open when this method returns. If some error occurs, an error will
-    # be thrown
     def start
       raise "server is already running" unless @shutdown
 
       @logger = make_logger
       @workers = make_worker_pool
       @supervisor = make_supervisor
-      @shutdown = false
-    end
-
-    def stop
-      raise "server is not yet running" if @shutdown
-
-      @supervisor.raise(Mooro::TerminateServer.new) if @supervisor.alive?
-      @supervisor.join
-
-      raise "orphaned ractor" unless Ractor.count == 1
-
-      @shutdown = true
-    end
-
-    def running?
-      !@shutdown
+      @running = true
     end
 
     protected
 
-    # Create a logger Ractor
-    # workers & supervisor ----> logger
+    # Create a logger Ractor which receives messages from supervisor and workers
     #
     # The logger logs messages to @stdlog with the timestamp of when the
-    # message was processed
-    # Workers and the supervisor will send messages to logger (push based)
+    # message was processed by the logger
     #
-    # Termination:
-    # Logger only yields once when it terminates. Do not take from it unless
-    # joining - the taking thread will hang otherwise
-    def make_logger(ractor_name: "logger")
-      Ractor.new(@stdlog, name: ractor_name) do |out_stream|
-        until (msg = Ractor.receive) == :terminate
+    # @param name [String] name the ractor
+    # @return [Ractor] the logger Ractor
+    def make_logger(name: "logger")
+      Ractor.new(@stdlog, name:) do |out_stream|
+        answer_loop do |msg|
           out_stream.puts("[#{Time.new.ctime}] #{msg}")
           out_stream.flush
         end
       end
     end
 
+    # Create worker pool
+    # @return [Hash<Ractor, Mooro::Worker>] Mapping between Ractor id and worker
     def make_worker_pool
       app = Ractor.make_shareable(method(:app).to_proc)
 
@@ -81,38 +66,20 @@ module Mooro
       end.to_h
     end
 
-    # Create a worker Ractor
-    # supervisor >---- worker ----> logger
-    #
-    # The worker actually serves the client
-    # Workers take a client from the supervisor (pull based)
-    # and send messages to logger when non-ractor exceptions are raised (push based)
-    #
-    # Termination:
-    # Workers do not stop while the supervisor is alive unless explicitly told to
+    def app(env)
+      [200, {}, ["Hello, World!"]]
+    end
 
     # Create a supervisor Ractor
     #
-    # supervisor >---- worker
-    #          |-----> logger
-    #
-    # The supervisor dispatches clients for the workers to take on
-    # Supervisor safely terminates on receiving TerminateServer error.
-    # This will be triggered remotely by the main thread on the main ractor.
+    # The supervisor dispatches requests for the workers to take on.
+    # Supervisor safely terminates on receiving SIGINT.
     # Graceful termination will safely join with workers and logger.
     # Assuming no workers or the logger is blocking, graceful termination guarantees
     # joining with all child ractors. This is becausee workers are guaranteed to
     # survive as long as the supervisor too is alive and well.
     #
-    # Termination:
-    # Any other error will trigger a "non-graceful" termination.
-    # We do not know if any child ractors are in a blocking state, so we cannot
-    # yield or take from any of them without risk of blocking the supervisor.
-    # So, the supervisor does not attempt to join.
-    def app(env)
-      [200, {}, ["Hello, World!"]]
-    end
-
+    # @return [Void]
     def make_supervisor
       server = Async::HTTP::Server.new(method(:serve_request), @endpoint)
       Async do |task|
@@ -123,6 +90,9 @@ module Mooro
       end
     end
 
+    # Transform Async::HTTP::Request object into Rack env
+    # @param request [Async::HTTP::Request] the reqeust from a client
+    # @return [Object] the response
     def serve_request(request)
       env = Adapter.new.make_environment(request)
       env = env.reject do |k, _|

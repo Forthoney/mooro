@@ -11,17 +11,14 @@ group :development do
   gem "rubocop-shopify", "~> 2.14", require: false
   gem "rubocop-rspec", require: false
   gem "steep", require: false
+  gem "yard", "~> 0.9.36", require: false
 end
 
 group :test do
   gem "rspec", "~> 3.0"
 end
 
-# Only need these gems when intending to use the full HTTP capabilities
-group :http, optional: true do
-  gem "protocol-http1", "~> 0.16.0"
-  # Need to apply console patch
-end
+gem "protocol-http1", "~> 0.16.0"
 
 gem "async-http", "~> 0.62.0"
 gem "protocol-rack"
@@ -31,5 +28,3 @@ gem "debug", "~> 1.9"
 gem "ractor-tvar", "~> 0.4.0"
 
 gem "rack", "~> 3.0"
-
-gem "yard", "~> 0.9.36"
