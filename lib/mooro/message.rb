@@ -5,5 +5,6 @@ module Mooro
     Terminate = Data.define
     Answer = Data.define(:content)
     Question = Data.define(:content)
+    Log = Data.define(:content)
   end
 end

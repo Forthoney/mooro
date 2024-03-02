@@ -4,9 +4,11 @@ require "async"
 require "async/http/server"
 require "async/http/endpoint"
 require "ractor/tvar"
+require "logger"
 require_relative "adapter"
 require_relative "message"
 require_relative "worker"
+require_relative "ractor_util"
 
 module Mooro
   class TerminateServer < StandardError; end
@@ -29,7 +31,7 @@ module Mooro
     end
 
     def start
-      raise "server is already running" unless @shutdown
+      raise "server is already running" if @running
 
       @logger = make_logger
       @workers = make_worker_pool
@@ -48,9 +50,9 @@ module Mooro
     # @return [Ractor] the logger Ractor
     def make_logger(name: "logger")
       Ractor.new(@stdlog, name:) do |out_stream|
-        answer_loop do |msg|
-          out_stream.puts("[#{Time.new.ctime}] #{msg}")
-          out_stream.flush
+        logger = Logger.new(out_stream)
+        logging_loop do |msg|
+          logger.info(msg)
         end
       end
     end
@@ -83,10 +85,11 @@ module Mooro
     def make_supervisor
       server = Async::HTTP::Server.new(method(:serve_request), @endpoint)
       Async do |task|
-        @logger.send("Listening on #{@endpoint}")
-        task.async do
+        @logger.send(Message::Log["Listening on #{@endpoint}"])
+        server_task = task.async do
           server.run
         end
+        Signal.trap("TERM") { server_task.stop }
       end
     end
 
@@ -95,11 +98,8 @@ module Mooro
     # @return [Object] the response
     def serve_request(request)
       env = Adapter.new.make_environment(request)
-      env = env.reject do |k, _|
-        ["protocol.http.request", "rack.hijack"].include?(k)
-      end.transform_values do |v|
-        Ractor.make_shareable(v)
-      end
+      env = env.slice(*env.keys - ["protocol.http.request", "rack.hijack"])
+        .transform_values(&Ractor.method(:make_shareable))
 
       worker_ractor = Ractor.receive_if { |msg| msg.is_a?(Ractor) }
 
