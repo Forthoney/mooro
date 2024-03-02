@@ -31,3 +31,5 @@ gem "debug", "~> 1.9"
 gem "ractor-tvar", "~> 0.4.0"
 
 gem "rack", "~> 3.0"
+
+gem "yard", "~> 0.9.36"

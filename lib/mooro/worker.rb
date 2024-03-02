@@ -40,6 +40,7 @@ module Mooro
     end
   end
 
+
   class Worker
     using WorkerUtil
 
@@ -48,7 +49,8 @@ module Mooro
     def initialize(logger, app, name:)
       @completed = Ractor::TVar.new(0)
       @prev_completed = 0
-      @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, _logger, app, completed|
+      @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, logger, app, completed|
+        logger.send("Worker #{Ractor.current.name} started")
         answer_loop(supervisor) do |env|
           status, fields, body = app.call(env)
 
@@ -62,14 +64,15 @@ module Mooro
       end
     end
 
-    def ask(question, task: Async::Task.current)
+    def ask(question, logger, task: Async::Task.current)
       @ractor.send(Message::Question[question])
 
       # wait until result produced
       task.yield while @prev_completed == @completed.value
 
       # update prev_completed
-      @prev_completed = @completed.value
+      @prev_completed += 1
+      logger.send("completed #{@prev_completed} reqs") if @prev_completed % 1000 == 0
       @ractor.take
     end
   end

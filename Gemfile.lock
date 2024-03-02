@@ -163,6 +163,7 @@ GEM
     tzinfo (2.0.6)
       concurrent-ruby (~> 1.0)
     unicode-display_width (2.5.0)
+    yard (0.9.36)
 
 PLATFORMS
   x86_64-linux
@@ -180,6 +181,7 @@ DEPENDENCIES
   rubocop-rspec
   rubocop-shopify (~> 2.14)
   steep
+  yard (~> 0.9.36)
 
 BUNDLED WITH
    2.4.22

@@ -116,6 +116,7 @@ module Mooro
     def make_supervisor
       server = Async::HTTP::Server.new(method(:serve_request), @endpoint)
       Async do |task|
+        @logger.send("Listening on #{@endpoint}")
         task.async do
           server.run
         end
@@ -132,9 +133,9 @@ module Mooro
 
       worker_ractor = Ractor.receive_if { |msg| msg.is_a?(Ractor) }
 
-      case @workers[worker_ractor].ask(env)
+      case @workers[worker_ractor].ask(env, @logger)
       in Message::Answer(response)
-        return response
+        response
       else
         raise "Response failed"
       end
