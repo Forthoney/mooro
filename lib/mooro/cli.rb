@@ -4,7 +4,7 @@ require "optparse"
 
 require_relative "server"
 
-module Mooro 
+module Mooro
   class CLI
     def initialize(argv)
       options = parse_options(argv.dup)

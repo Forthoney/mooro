@@ -69,6 +69,8 @@ module Mooro
     end
 
     def app(env)
+      fib = lambda { |n| [1, 2].include?(n) ? 1 : fib.call(n - 1) + fib.call(n - 2) }
+      fib.call(20)
       [200, {}, ["Hello, World!"]]
     end
 
@@ -85,7 +87,7 @@ module Mooro
     def make_supervisor
       server = Async::HTTP::Server.new(method(:serve_request), @endpoint)
       Async do |task|
-        @logger.send(Message::Log["Listening on #{@endpoint}"])
+        @logger.send(Message::Log["Listening on #{@endpoint}".freeze], move: true)
         server_task = task.async do
           server.run
         end

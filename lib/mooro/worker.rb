@@ -16,7 +16,8 @@ module Mooro
       @completed = Ractor::TVar.new(0)
       @prev_completed = 0
       @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, logger, app, completed|
-        logger.send(Message::Log["Worker #{Ractor.current.name} started"])
+        logger.send(Message::Log["Worker #{Ractor.current.name} started".freeze], move: true)
+
         answer_loop(supervisor) do |env|
           status, fields, body = app.call(env)
 
@@ -45,7 +46,6 @@ module Mooro
 
       # update prev_completed
       @prev_completed += 1
-      logger.send(Message::Log["completed #{@prev_completed} reqs"]) if @prev_completed % 1000 == 0
       @ractor.take
     end
   end
