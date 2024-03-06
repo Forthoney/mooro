@@ -3,9 +3,10 @@
 require "async"
 require "async/http/server"
 require "async/http/endpoint"
+require "protocol/rack"
 require "ractor/tvar"
 require "logger"
-require_relative "adapter"
+
 require_relative "message"
 require_relative "worker"
 require_relative "ractor_util"
@@ -16,7 +17,7 @@ module Mooro
   class Server
     using RactorUtil
 
-    attr_reader :runnin
+    attr_reader :running
 
     def initialize(
       max_connections,
@@ -69,8 +70,7 @@ module Mooro
     end
 
     def app(env)
-      fib = lambda { |n| [1, 2].include?(n) ? 1 : fib.call(n - 1) + fib.call(n - 2) }
-      fib.call(20)
+      env["rack.logger"].info("LOGGING TEST")
       [200, {}, ["Hello, World!"]]
     end
 
@@ -85,21 +85,26 @@ module Mooro
     #
     # @return [Void]
     def make_supervisor
-      server = Async::HTTP::Server.new(method(:serve_request), @endpoint)
+      adapter = Protocol::Rack::Adapter.new(method(:pass_to_worker))
+      server = Async::HTTP::Server.new(adapter, @endpoint)
       Async do |task|
         @logger.send(Message::Log["Listening on #{@endpoint}".freeze], move: true)
         server_task = task.async do
           server.run
         end
-        Signal.trap("TERM") { server_task.stop }
+
+        Signal.trap("TERM") do
+          server_task.stop
+          @workers.each(&:join)
+          @running = false
+        end
       end
     end
 
     # Transform Async::HTTP::Request object into Rack env
     # @param request [Async::HTTP::Request] the reqeust from a client
     # @return [Object] the response
-    def serve_request(request)
-      env = Adapter.new.make_environment(request)
+    def pass_to_worker(env)
       env = env.slice(*env.keys - ["protocol.http.request", "rack.hijack"])
         .transform_values(&Ractor.method(:make_shareable))
 

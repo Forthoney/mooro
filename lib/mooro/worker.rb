@@ -48,5 +48,10 @@ module Mooro
       @prev_completed += 1
       @ractor.take
     end
+
+    def join
+      @ractor.send(Message::Terminate[])
+      @ractor.take
+    end
   end
 end
