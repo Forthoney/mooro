@@ -67,6 +67,10 @@ module Mooro
       end.to_h
     end
 
+    def app(env)
+      [200, {}, ["Hello, World!"]]
+    end
+
     # Create a supervisor Ractor
     #
     # The supervisor dispatches requests for the workers to take on.

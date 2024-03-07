@@ -11,7 +11,6 @@ module Mooro
 
       refine Console::Logger do
         def info(message)
-          puts "HERE"
           Ractor.current[:logger].send(Info[message.to_s.freeze])
         end
 
