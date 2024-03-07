@@ -5,14 +5,14 @@ require "ractor/tvar"
 
 require_relative "util/message"
 require_relative "util/ractor_helper"
-require_relative "util/logger_stub"
+require_relative "util/logger_rpc"
 
 module Mooro
   class Worker
     include Util::Message
 
     using Util::RactorHelper
-    using Util::LoggerStub
+    using Util::LoggerRPC
 
     attr_reader :ractor
 

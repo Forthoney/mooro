@@ -6,7 +6,7 @@ require_relative "message"
 
 module Mooro
   module Util
-    module LoggerStub
+    module LoggerRPC
       include Message
 
       refine Console::Logger do
