@@ -5,17 +5,16 @@ require "async/http/server"
 require "async/http/endpoint"
 require "protocol/rack"
 require "ractor/tvar"
-require "logger"
+require "console"
 
-require_relative "message"
 require_relative "worker"
-require_relative "ractor_util"
+require_relative "util/message"
+require_relative "util/ractor_helper"
 
 module Mooro
-  class TerminateServer < StandardError; end
-
   class Server
-    using RactorUtil
+    include Util::Message
+    using Util::RactorHelper
 
     attr_reader :running
 
@@ -50,10 +49,9 @@ module Mooro
     # @param name [String] name the ractor
     # @return [Ractor] the logger Ractor
     def make_logger(name: "logger")
-      Ractor.new(@stdlog, name:) do |out_stream|
-        logger = Logger.new(out_stream)
+      Ractor.new(@stdlog, name:) do |_out_stream|
         logging_loop do |msg|
-          logger.info(msg)
+          Console.info(msg)
         end
       end
     end
@@ -67,11 +65,6 @@ module Mooro
         worker = Worker.new(@logger, app, name: "worker-#{i}")
         [worker.ractor, worker]
       end.to_h
-    end
-
-    def app(env)
-      env["rack.logger"].info("LOGGING TEST")
-      [200, {}, ["Hello, World!"]]
     end
 
     # Create a supervisor Ractor
@@ -88,7 +81,7 @@ module Mooro
       adapter = Protocol::Rack::Adapter.new(method(:pass_to_worker))
       server = Async::HTTP::Server.new(adapter, @endpoint)
       Async do |task|
-        @logger.send(Message::Log["Listening on #{@endpoint}".freeze], move: true)
+        @logger.send(Log["Listening on #{@endpoint}".freeze], move: true)
         server_task = task.async do
           server.run
         end
@@ -111,7 +104,7 @@ module Mooro
       worker_ractor = Ractor.receive_if { |msg| msg.is_a?(Ractor) }
 
       case @workers[worker_ractor].ask(env, @logger)
-      in Message::Answer(response)
+      in Answer(response)
         response
       else
         raise "Response failed"

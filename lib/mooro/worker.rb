@@ -3,12 +3,16 @@
 require "async"
 require "ractor/tvar"
 
-require_relative "message"
-require_relative "ractor_util"
+require_relative "util/message"
+require_relative "util/ractor_helper"
+require_relative "util/logger_stub"
 
 module Mooro
   class Worker
-    using RactorUtil
+    include Util::Message
+
+    using Util::RactorHelper
+    using Util::LoggerStub
 
     attr_reader :ractor
 
@@ -16,7 +20,12 @@ module Mooro
       @completed = Ractor::TVar.new(0)
       @prev_completed = 0
       @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, logger, app, completed|
-        logger.send(Message::Log["Worker #{Ractor.current.name} started".freeze], move: true)
+        logger.send(Log["Worker #{Ractor.current.name} started".freeze], move: true)
+        Ractor.current[:logger] = logger
+
+        app = ->(env) {
+          [200, {}, ["Hello, World!"]]
+        }
 
         answer_loop(supervisor) do |env|
           status, fields, body = app.call(env)
@@ -39,7 +48,7 @@ module Mooro
     # @param task [Async::Task]
     # @return [Object]
     def ask(question, logger, task: Async::Task.current)
-      @ractor.send(Message::Question[question])
+      @ractor.send(Question[question])
 
       # wait until result produced
       task.yield while @prev_completed == @completed.value
@@ -50,7 +59,7 @@ module Mooro
     end
 
     def join
-      @ractor.send(Message::Terminate[])
+      @ractor.send(Terminate[])
       @ractor.take
     end
   end
