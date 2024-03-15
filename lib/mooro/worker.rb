@@ -50,9 +50,7 @@ module Mooro
     # @return [Object]
     def ask(question)
       @ractor.send(Question[question])
-      Async::Task.current.yield until @completed.value > @prev_completed
-      @prev_completed += 1
-      @ractor.take
+      Thread.new { @ractor.take }.value
     end
 
     def join
