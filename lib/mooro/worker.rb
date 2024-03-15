@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "benchmark"
+
 require "async"
 require "ractor/tvar"
 
@@ -15,25 +17,25 @@ module Mooro
     using Util::LoggerRPC
 
     attr_reader :ractor
+    attr_reader :name
 
     def initialize(logger, app, name:)
+      @name = name
       @completed = Ractor::TVar.new(0)
       @prev_completed = 0
       @ractor = Ractor.new(Ractor.current, logger, app, @completed, name:) do |supervisor, logger, app, completed|
-        logger.send(Log["Worker #{Ractor.current.name} started".freeze], move: true)
+        logger.send(Info["Worker #{Ractor.current.name} initialized".freeze], move: true)
         Ractor.current[:logger] = logger
 
-        app = ->(env) {
-          [200, {}, ["Hello, World!"]]
-        }
-
         answer_loop(supervisor) do |env|
+          logger.send(Info["Worker #{Ractor.current.name} starting req at #{Process.clock_gettime(Process::CLOCK_MONOTONIC)}".freeze], move: true)
           status, fields, body = app.call(env)
 
           raise ArgumentError, "Status must be an integer!" unless status.is_a?(Integer)
           raise ArgumentError, "Headers must not be nil!" unless fields
 
           res = generate_response(env, status, fields, body)
+          logger.send(Info["Worker #{Ractor.current.name} completed req at #{Process.clock_gettime(Process::CLOCK_MONOTONIC)}".freeze], move: true)
           Ractor.atomically { completed.value += 1 }
           res
         end
@@ -44,16 +46,11 @@ module Mooro
     # Asynchronously yields while the response is not ready
     # @see #question_loop
     # @param question [Object]
-    # @param logger [Ractor]
     # @param task [Async::Task]
     # @return [Object]
-    def ask(question, logger, task: Async::Task.current)
+    def ask(question)
       @ractor.send(Question[question])
-
-      # wait until result produced
-      task.yield while @prev_completed == @completed.value
-
-      # update prev_completed
+      Async::Task.current.yield until @completed.value > @prev_completed
       @prev_completed += 1
       @ractor.take
     end

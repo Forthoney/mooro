@@ -19,13 +19,13 @@ module Mooro
     attr_reader :running
 
     def initialize(
-      max_connections,
+      n_workers,
       endpoint = "http://127.0.0.1:10001",
       stdlog = $stderr
     )
 
       @endpoint = Async::HTTP::Endpoint.parse(endpoint)
-      @max_connections = max_connections
+      @n_workers = n_workers
       @stdlog = stdlog
       @running = false
     end
@@ -35,6 +35,8 @@ module Mooro
 
       @logger = make_logger
       @workers = make_worker_pool
+      @available_workers = Async::Queue.new
+
       @supervisor = make_supervisor
       @running = true
     end
@@ -61,20 +63,21 @@ module Mooro
     def make_worker_pool
       app = Ractor.make_shareable(method(:app).to_proc)
 
-      @max_connections.times.map do |i|
-        worker = Worker.new(@logger, app, name: "worker-#{i}")
-        [worker.ractor, worker]
-      end.to_h
+      @n_workers.times.map do |i|
+        Worker.new(@logger, app, name: i.to_s)
+      end
     end
 
     def app(env)
+      fib = ->(x) { x < 2 ? 1 : fib.call(x - 2) + fib.call(x - 1) }
+      fib.call(30)
       [200, {}, ["Hello, World!"]]
     end
 
     # Create a supervisor Ractor
     #
     # The supervisor dispatches requests for the workers to take on.
-    # Supervisor safely terminates on receiving SIGINT.
+    # Supervisor safely terminates on receiving SIGTERM.
     # Graceful termination will safely join with workers and logger.
     # Assuming no workers or the logger is blocking, graceful termination guarantees
     # joining with all child ractors. This is becausee workers are guaranteed to
@@ -85,15 +88,12 @@ module Mooro
       adapter = Protocol::Rack::Adapter.new(method(:pass_to_worker))
       server = Async::HTTP::Server.new(adapter, @endpoint)
       Async do |task|
+        @available_workers.enqueue(*@workers)
+
         @logger.send(Log["Listening on #{@endpoint}".freeze], move: true)
+
         server_task = task.async do
           server.run
-        end
-
-        Signal.trap("TERM") do
-          server_task.stop
-          @workers.each(&:join)
-          @running = false
         end
       end
     end
@@ -105,14 +105,14 @@ module Mooro
       env = env.slice(*env.keys - ["protocol.http.request", "rack.hijack"])
         .transform_values(&Ractor.method(:make_shareable))
 
-      worker_ractor = Ractor.receive_if { |msg| msg.is_a?(Ractor) }
+      selected_worker = @available_workers.dequeue
+      @logger.send(Info["Worker #{selected_worker.name} ask: #{Process.clock_gettime(Process::CLOCK_MONOTONIC)}"])
 
-      case @workers[worker_ractor].ask(env, @logger)
-      in Answer(response)
-        response
-      else
-        raise "Response failed"
-      end
+      response = selected_worker.ask(env)
+
+      @logger.send(Info["Worker #{selected_worker.name} answer: #{Process.clock_gettime(Process::CLOCK_MONOTONIC)}"])
+      @available_workers << selected_worker
+      response
     end
   end
 end

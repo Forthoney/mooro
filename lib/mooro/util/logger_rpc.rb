@@ -9,7 +9,7 @@ module Mooro
     module LoggerRPC
       include Message
 
-      refine Console::Logger do
+      refine Console do
         def info(message)
           Ractor.current[:logger].send(Info[message.to_s.freeze])
         end

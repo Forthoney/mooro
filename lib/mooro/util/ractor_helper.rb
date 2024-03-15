@@ -6,6 +6,7 @@ require "console"
 module Mooro
   module Util
     module RactorHelper
+      include Util::Message
       # Due to Ractor sharing constraints, if there is a function you know
       # ahead of time that you know you'll want to use inside the Ractor,
       # it's best to add it as a refinement rather than passing it in the Ractor
@@ -21,12 +22,11 @@ module Mooro
         # @return [Void]
         def answer_loop(questioner, &block)
           loop do
-            questioner.send(Ractor.current) # ME! I'm ready for a new question!
             case Ractor.receive
-            in Message::Terminate
+            in Terminate
               break
-            in Message::Question(content)
-              Ractor.yield(Message::Answer[yield(content)])
+            in Question(content)
+              Ractor.yield(yield(content))
             end
           end
         end
@@ -34,9 +34,9 @@ module Mooro
         def logging_loop(&block)
           loop do
             case Ractor.receive
-            in Message::Terminate
+            in Terminate
               break
-            in Message::Log(content)
+            in Log(content)
               yield(content)
             end
           end
